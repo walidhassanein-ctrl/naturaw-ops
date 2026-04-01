@@ -1,0 +1,7 @@
+[build]
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/notion"
+  to = "/.netlify/functions/notion"
+  status = 200

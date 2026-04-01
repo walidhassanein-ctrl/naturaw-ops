@@ -1,79 +1,58 @@
 const https = require('https');
 
-exports.handler = async function(event) {
+exports.handler = function(event, context, callback) {
   const NOTION_TOKEN = process.env.NOTION_TOKEN;
 
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*'
+  };
+
   if (!NOTION_TOKEN) {
-    return {
-      statusCode: 500,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ error: 'NOTION_TOKEN not set' })
-    };
+    return callback(null, { statusCode: 500, headers: headers, body: JSON.stringify({ error: 'NOTION_TOKEN not set' }) });
   }
 
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS'
-      },
-      body: ''
-    };
+    return callback(null, { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS' }, body: '' });
   }
 
-  try {
-    const path = (event.queryStringParameters && event.queryStringParameters.path) || '';
-    const notionUrl = 'https://api.notion.com/v1' + path;
-    const parsedUrl = new URL(notionUrl);
+  var path = '/v1' + ((event.queryStringParameters && event.queryStringParameters.path) || '');
 
-    const reqOptions = {
-      hostname: parsedUrl.hostname,
-      path: parsedUrl.pathname + parsedUrl.search,
-      method: event.httpMethod,
-      headers: {
-        'Authorization': 'Bearer ' + NOTION_TOKEN,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json'
-      }
-    };
+  var reqOptions = {
+    hostname: 'api.notion.com',
+    port: 443,
+    path: path,
+    method: event.httpMethod || 'GET',
+    headers: {
+      'Authorization': 'Bearer ' + NOTION_TOKEN,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json'
+    }
+  };
 
-    return await new Promise((resolve) => {
-      const req = https.request(reqOptions, (res) => {
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          resolve({
-            statusCode: res.statusCode,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*'
-            },
-            body: data
-          });
-        });
+  var req = https.request(reqOptions, function(res) {
+    var data = '';
+    res.on('data', function(chunk) { data += chunk; });
+    res.on('end', function() {
+      callback(null, {
+        statusCode: res.statusCode,
+        headers: headers,
+        body: data
       });
-
-      req.on('error', (err) => {
-        resolve({
-          statusCode: 500,
-          headers: { 'Access-Control-Allow-Origin': '*' },
-          body: JSON.stringify({ error: 'Request failed', detail: err.message, stack: err.stack })
-        });
-      });
-
-      if (event.body && event.httpMethod !== 'GET') {
-        req.write(event.body);
-      }
-      req.end();
     });
+  });
 
-  } catch(err) {
-    return {
+  req.on('error', function(err) {
+    callback(null, {
       statusCode: 500,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ error: 'Handler failed', detail: err.message, stack: err.stack })
-    };
+      headers: headers,
+      body: JSON.stringify({ error: err.message })
+    });
+  });
+
+  if (event.body && event.httpMethod !== 'GET') {
+    req.write(event.body);
   }
+
+  req.end();
 };

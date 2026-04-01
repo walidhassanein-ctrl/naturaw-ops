@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NatuRaw Ops</title>
+<style>
+:root {
+  --bg: #f5f4f0; --bg1: #ffffff; --bg2: #f0efe8; --bg3: #e8e7df;
+  --text: #1a1a18; --text2: #6b6a66; --text3: #9a9992;
+  --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18); --border3: rgba(0,0,0,0.28);
+  --teal: #1D9E75; --teal2: #5DCAA5;
+  --amber-bg: #FAEEDA; --amber: #854F0B;
+  --blue-bg: #E6F1FB; --blue: #185FA5;
+  --green-bg: #EAF3DE; --green: #3B6D11;
+  --purple-bg: #EEEDFE; --purple: #534AB7;
+  --red-bg: #FCEBEB; --red: #A32D2D;
+  --r: 8px; --rl: 12px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'SF Mono', 'Fira Code', monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a18; --bg1: #242422; --bg2: #2c2c29; --bg3: #353532;
+    --text: #f0efe8; --text2: #9a9992; --text3: #6b6a66;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13); --border3: rgba(255,255,255,0.22);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+.hdr { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.hdr h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.hdr .sl { font-size: 12px; color: var(--text2); }
+.hdr .sp { flex: 1; }
+
+.nav { display: flex; gap: 5px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.nav button { padding: 6px 13px; border: 0.5px solid var(--border2); border-radius: var(--r); background: var(--bg1); color: var(--text2); font-size: 13px; cursor: pointer; font-family: var(--font); }
+.nav button:hover { background: var(--bg2); }
+.nav button.active { background: var(--bg2); color: var(--text); border-color: var(--border3); font-weight: 500; }
+
+.tab { display: none; } .tab.active { display: block; }
+.card { background: var(--bg1); border: 0.5px solid var(--border); border-radius: var(--rl); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.ct { font-size: 11px; color: var(--text2); margin-bottom: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.mg { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 1rem; }
+.m { background: var(--bg2); border-radius: var(--r); padding: 0.85rem 1rem; }
+.ml { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.mv { font-size: 20px; font-weight: 500; }
+.ms { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--text2); font-weight: 500; padding: 7px 10px; border-bottom: 0.5px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+td { padding: 9px 10px; border-bottom: 0.5px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; white-space: nowrap; }
+.bn { background: var(--bg2); color: var(--text2); }
+.bprep { background: var(--amber-bg); color: var(--amber); }
+.bout { background: var(--blue-bg); color: var(--blue); }
+.bdone { background: var(--green-bg); color: var(--green); }
+.bstand { background: var(--purple-bg); color: var(--purple); }
+.btbd { background: var(--red-bg); color: var(--red); font-size: 10px; }
+
+.row { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+input, select, textarea { padding: 7px 10px; border: 0.5px solid var(--border2); border-radius: var(--r); background: var(--bg1); color: var(--text); font-size: 13px; font-family: var(--font); outline: none; }
+input:focus, select:focus { border-color: var(--border3); }
+
+.btn { padding: 7px 14px; border: 0.5px solid var(--border2); border-radius: var(--r); background: var(--bg1); color: var(--text); font-size: 13px; cursor: pointer; font-family: var(--font); }
+.btn:hover { background: var(--bg2); }
+.btn:active { transform: scale(0.98); }
+.btnp { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btnp:hover { opacity: 0.85; }
+.btns { padding: 5px 10px; font-size: 12px; }
+.btnx { color: var(--red); border-color: rgba(163,45,45,0.3); }
+.btnx:hover { background: var(--red-bg); }
+
+.ob { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--r); padding: 1rem; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; line-height: 1.7; max-height: 380px; overflow-y: auto; }
+.cr { display: flex; justify-content: flex-end; margin-top: 8px; }
+.hint { font-size: 13px; color: var(--text2); padding: 2rem; text-align: center; }
+.divl { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
+
+.fg { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fg label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.fg input, .fg select { width: 100%; }
+.full { grid-column: 1/-1; }
+
+.pg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+@media (max-width: 600px) { .pg { grid-template-columns: repeat(3, 1fr); } .fg { grid-template-columns: 1fr; } }
+.pi label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 3px; line-height: 1.4; }
+.pi input { width: 100%; text-align: center; }
+
+.sep { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.25rem 0 0.6rem; font-weight: 500; padding-bottom: 6px; border-bottom: 0.5px solid var(--border); }
+
+.br { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.bl { font-size: 12px; color: var(--text2); width: 130px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btr { flex: 1; background: var(--bg2); border-radius: 2px; height: 12px; overflow: hidden; }
+.bfl { height: 100%; border-radius: 2px; }
+.bvl { font-size: 12px; font-weight: 500; width: 75px; text-align: right; flex-shrink: 0; }
+
+.sm { font-size: 13px; color: var(--text2); line-height: 2.2; }
+.ok { color: var(--green) !important; }
+.er { color: var(--red) !important; }
+.ld { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <h1>NatuRaw Ops</h1>
+    <span class="sl" id="sl">Loading...</span>
+    <div class="sp"></div>
+    <button class="btn btns" onclick="loadAll()">Sync</button>
+  </div>
+
+  <div class="nav">
+    <button class="active" onclick="showTab('delivery',this)">Delivery list</button>
+    <button onclick="showTab('invoice',this)">Invoice</button>
+    <button onclick="showTab('neworder',this)">New order</button>
+    <button onclick="showTab('standing',this)">Standing orders</button>
+    <button onclick="showTab('sales',this)">Sales</button>
+    <button onclick="showTab('pricing',this)">Pricing</button>
+  </div>
+
+  <!-- DELIVERY -->
+  <div id="tab-delivery" class="tab active">
+    <div class="row">
+      <input type="date" id="ddate" />
+      <button class="btn" onclick="loadDelivery()">Load</button>
+      <button class="btn btnp" onclick="genCourier()">Generate courier message</button>
+    </div>
+    <div id="dcontent"><p class="hint">Select a date and click Load.</p></div>
+    <div id="dcourier" style="display:none">
+      <hr class="divl">
+      <div class="ct">Courier message — copy and send via WhatsApp</div>
+      <div class="ob" id="dctext"></div>
+      <div class="cr"><button class="btn" onclick="cp('dctext',this)">Copy</button></div>
+    </div>
+  </div>
+
+  <!-- INVOICE -->
+  <div id="tab-invoice" class="tab">
+    <div class="row">
+      <select id="isel" style="min-width:300px"><option value="">Select an order...</option></select>
+      <button class="btn btnp" onclick="genInvoice()">Generate</button>
+    </div>
+    <div id="iout" style="display:none">
+      <div class="ob" id="itext"></div>
+      <div class="cr"><button class="btn" onclick="cp('itext',this)">Copy for WhatsApp</button></div>
+    </div>
+  </div>
+
+  <!-- NEW ORDER -->
+  <div id="tab-neworder" class="tab">
+    <div class="card">
+      <div class="ct">New order</div>
+      <div class="fg">
+        <div><label>Customer</label><select id="ncust"><option value="">Select...</option></select></div>
+        <div><label>Delivery date</label><input type="date" id="ndd" /></div>
+        <div><label>Order date</label><input type="date" id="nod" /></div>
+        <div><label>Payment method</label>
+          <select id="npay"><option>Cash</option><option>Instapay</option><option>Vodafone Cash</option><option>Transfer</option></select>
+        </div>
+        <div class="full">
+          <div class="sep">Products</div>
+          <div id="npg" class="pg"></div>
+        </div>
+        <div><label>Total (EGP)</label><input type="number" id="ntotal" placeholder="Auto or override" /></div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+          <input type="checkbox" id="nstand" onchange="toggleSt()" />
+          <label for="nstand" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);margin-bottom:0;cursor:pointer;">Standing order</label>
+        </div>
+        <div id="nfreqw" style="display:none">
+          <label>Frequency</label>
+          <select id="nfreq"><option>Weekly</option><option>Bi-weekly</option><option>Monthly</option></select>
+        </div>
+        <div class="full"><label>Notes</label><input type="text" id="nnotes" placeholder="Special instructions..." /></div>
+      </div>
+      <div style="margin-top:1rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btnp" onclick="submitOrder()">Create in Notion</button>
+        <span id="nmsg" class="sm"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STANDING -->
+  <div id="tab-standing" class="tab"><div id="stcontent"><p class="hint">Loading...</p></div></div>
+
+  <!-- SALES -->
+  <div id="tab-sales" class="tab">
+    <div class="row">
+      <select id="speriod" onchange="renderSales()">
+        <option value="all">All time</option>
+        <option value="month">This month</option>
+        <option value="last30">Last 30 days</option>
+        <option value="year">This year</option>
+      </select>
+    </div>
+    <div id="scontent"><p class="hint">Loading...</p></div>
+  </div>
+
+  <!-- PRICING -->
+  <div id="tab-pricing" class="tab">
+    <div class="card">
+      <div class="ct">Live prices — edit in Notion, then Sync</div>
+      <div id="prcontent"><p class="hint">Loading...</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+// Your Notion database IDs
+const DB_ORDERS    = '308bd212-68bb-802b-a88c-c5ed3bb0bffa';
+const DB_CUSTOMERS = 'ae8d6fc0-333a-4a93-b09d-564d267377f5';
+const DB_PRODUCTS  = '33332c20-c289-49dc-83ae-8406b07b1e6b';
+
+// Proxy endpoint (routes through Netlify function)
+const PROXY = '/api/notion';
+
+// ─── PRODUCT KEYS ──────────────────────────────────────────────────────────
+const PKEYS = ['Beef Dinner 300','Beef Dinner 500','Chicken Dinner 300','Chicken Dinner 500',
+               'Rabbit Dinner 300','Rabbit Dinner 500','Duck Dinner 300','Duck Dinner 500','Bone','Daily Boost'];
+const PNAME = {
+  'Beef Dinner 300':'Beef Dinner 300g','Beef Dinner 500':'Beef Dinner 500g',
+  'Chicken Dinner 300':'Chicken Dinner 300g','Chicken Dinner 500':'Chicken Dinner 500g',
+  'Rabbit Dinner 300':'Rabbit Dinner 300g','Rabbit Dinner 500':'Rabbit Dinner 500g',
+  'Duck Dinner 300':'Duck Dinner 300g','Duck Dinner 500':'Duck Dinner 500g',
+  'Bone':'Bone','Daily Boost':'Daily Boost / Orbs'
+};
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let orders = [], customers = [], products = [];
+
+// ─── API ───────────────────────────────────────────────────────────────────
+async function nGet(path) {
+  const r = await fetch(`${PROXY}?path=${encodeURIComponent(path)}`);
+  if (!r.ok) throw new Error(`GET ${path} → ${r.status}`);
+  return r.json();
+}
+
+async function nPost(path, body) {
+  const r = await fetch(`${PROXY}?path=${encodeURIComponent(path)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) { const e = await r.json(); throw new Error(e.message || r.status); }
+  return r.json();
+}
+
+async function queryDB(dbId, filter) {
+  let results = [], cursor;
+  do {
+    const body = { page_size: 100 };
+    if (filter) body.filter = filter;
+    if (cursor) body.start_cursor = cursor;
+    const d = await nPost(`/databases/${dbId}/query`, body);
+    results = results.concat(d.results);
+    cursor = d.has_more ? d.next_cursor : null;
+  } while (cursor);
+  return results;
+}
+
+// ─── PROP HELPERS ──────────────────────────────────────────────────────────
+const pTxt = (p, n) => { const x = p.properties[n]; if (!x) return null; if (x.type==='title') return x.title?.map(t=>t.plain_text).join('')||null; if (x.type==='rich_text') return x.rich_text?.map(t=>t.plain_text).join('')||null; if (x.type==='select') return x.select?.name||null; if (x.type==='phone_number') return x.phone_number||null; return null; };
+const pNum = (p, n) => p.properties[n]?.number ?? 0;
+const pBool = (p, n) => p.properties[n]?.checkbox ?? false;
+const pDate = (p, n) => p.properties[n]?.date?.start || null;
+const pRel = (p, n) => (p.properties[n]?.relation || []).map(r => r.id);
+
+// ─── LOAD ALL ──────────────────────────────────────────────────────────────
+async function loadAll() {
+  setSL('Syncing...', true);
+  try {
+    const [rawO, rawC, rawP] = await Promise.all([
+      queryDB(DB_ORDERS),
+      queryDB(DB_CUSTOMERS),
+      queryDB(DB_PRODUCTS)
+    ]);
+
+    products = rawP.map(p => ({
+      id: p.id,
+      name: pTxt(p,'Product') || pTxt(p,'Product Name') || '',
+      price: pNum(p,'Price (EGP)'),
+      cost: pNum(p,'Cost (EGP)'),
+      sku: pTxt(p,'SKU') || '',
+      notes: pTxt(p,'Notes') || ''
+    }));
+
+    customers = rawC.map(c => ({
+      id: c.id,
+      name: pTxt(c,'Customer') || pTxt(c,'Name') || '—',
+      phone: pTxt(c,'Phone'),
+      address: pTxt(c,'Address'),
+      area: pTxt(c,'Area / Zone')
+    }));
+
+    const cMap = {};
+    customers.forEach(c => cMap[c.id] = c);
+
+    orders = rawO.map(o => {
+      const custIds = pRel(o,'Customer');
+      const cust = custIds.map(id => cMap[id]).find(Boolean);
+      return {
+        id: o.id,
+        orderId: pTxt(o,'Order ID') || '',
+        customer: cust?.name || null,
+        phone: cust?.phone || null,
+        address: cust?.address || null,
+        area: cust?.area || null,
+        orderDate: pDate(o,'Order Date'),
+        deliveryDate: pDate(o,'Delivery Date'),
+        status: pTxt(o,'Status') || 'New',
+        paid: pBool(o,'Paid?'),
+        paymentMethod: pTxt(o,'Payment Method'),
+        totalPrice: pNum(o,'Total Price') || null,
+        invoiceNumber: pTxt(o,'Invoice Number'),
+        standingOrder: pBool(o,'Standing Order'),
+        standingFrequency: pTxt(o,'Standing Frequency'),
+        nextRecurrenceDate: pDate(o,'Next Recurrence Date'),
+        notes: pTxt(o,'Notes'),
+        archived: pBool(o,'Archived'),
+        b300: pNum(o,'Beef Dinner 300'), b500: pNum(o,'Beef Dinner 500'),
+        c300: pNum(o,'Chicken Dinner 300'), c500: pNum(o,'Chicken Dinner 500'),
+        r300: pNum(o,'Rabbit Dinner 300'), r500: pNum(o,'Rabbit Dinner 500'),
+        d300: pNum(o,'Duck Dinner 300'), d500: pNum(o,'Duck Dinner 500'),
+        bone: pNum(o,'Bone'), boost: pNum(o,'Daily Boost')
+      };
+    });
+
+    setSL(`Synced ${orders.length} orders · ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`);
+    populateUI();
+  } catch(e) {
+    setSL('Sync failed: ' + e.message);
+    console.error(e);
+  }
+}
+
+function px(k) { const p = products.find(x => x.name === PNAME[k] || x.name === k); return p ? (p.price||0) : 0; }
+function op(o) { return {'Beef Dinner 300':o.b300||0,'Beef Dinner 500':o.b500||0,'Chicken Dinner 300':o.c300||0,'Chicken Dinner 500':o.c500||0,'Rabbit Dinner 300':o.r300||0,'Rabbit Dinner 500':o.r500||0,'Duck Dinner 300':o.d300||0,'Duck Dinner 500':o.d500||0,'Bone':o.bone||0,'Daily Boost':o.boost||0}; }
+
+// ─── UI ────────────────────────────────────────────────────────────────────
+function populateUI() {
+  const cs = document.getElementById('ncust');
+  cs.innerHTML = '<option value="">Select customer...</option>';
+  [...customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c => {
+    cs.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+  });
+  const is = document.getElementById('isel');
+  is.innerHTML = '<option value="">Select an order...</option>';
+  [...orders].filter(o=>!o.archived).sort((a,b)=>(b.deliveryDate||'').localeCompare(a.deliveryDate||'')).forEach(o => {
+    is.innerHTML += `<option value="${o.id}">${o.orderId||o.id.slice(0,8)} — ${o.customer||'?'} (${o.deliveryDate||'—'})</option>`;
+  });
+  buildPG(); renderPricing(); renderStanding(); renderSales();
+}
+
+function buildPG() {
+  document.getElementById('npg').innerHTML = PKEYS.map(k => {
+    const p = px(k), tbd = p===0;
+    const lbl = k.replace(' Dinner','').replace(/ (300|500)$/,'');
+    const sz = k.match(/300/)? '300g' : k.match(/500/)? '500g' : '';
+    const sub = tbd ? '<span style="color:#A32D2D">TBD</span>' : 'EGP '+p;
+    return `<div class="pi"><label>${lbl}<br><span style="font-size:10px;color:var(--text3)">${sz?sz+' · ':''}${sub}</span></label><input type="number" id="p_${k.replace(/ /g,'_')}" min="0" value="0" onchange="calcT()" /></div>`;
+  }).join('');
+}
+
+function calcT() {
+  let t = 0;
+  PKEYS.forEach(k => { const el = document.getElementById('p_'+k.replace(/ /g,'_')); if(el) t += (parseInt(el.value)||0)*px(k); });
+  if(t>0) document.getElementById('ntotal').value = t;
+}
+
+function toggleSt() { document.getElementById('nfreqw').style.display = document.getElementById('nstand').checked ? 'block' : 'none'; }
+function setSL(t, loading) { const el=document.getElementById('sl'); el.textContent=t; el.className='sl'+(loading?' ld':''); }
+function showTab(n,btn) { document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active')); document.getElementById('tab-'+n).classList.add('active'); if(btn)btn.classList.add('active'); }
+
+// ─── DELIVERY ──────────────────────────────────────────────────────────────
+function loadDelivery() {
+  const date = document.getElementById('ddate').value; if(!date) return;
+  const day = orders.filter(o=>o.deliveryDate===date&&!o.archived);
+  document.getElementById('dcourier').style.display = 'none';
+  if(!day.length){document.getElementById('dcontent').innerHTML=`<p class="hint">No deliveries for ${fd(date)}.</p>`;return;}
+  let h = `<div class="card"><div class="ct">${day.length} order${day.length>1?'s':''} — ${fd(date)}</div><div style="overflow-x:auto"><table><thead><tr><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Notes</th><th>Status</th></tr></thead><tbody>`;
+  day.forEach(o => {
+    h += `<tr><td><strong>${o.customer||'—'}</strong>${o.standingOrder?' <span class="badge bstand">standing</span>':''}<br><span style="font-size:11px;color:var(--text3)">${o.phone||''}</span></td><td style="font-size:12px">${fp(op(o))}</td><td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td><td style="font-size:12px">${o.paymentMethod||'—'}<br><span style="font-size:11px;color:${o.paid?'var(--green)':'var(--red)'}">${o.paid?'Paid':'Collect'}</span></td><td style="font-size:12px;color:var(--text2)">${o.notes||''}</td><td>${bfor(o.status)}</td></tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  document.getElementById('dcontent').innerHTML = h;
+}
+
+function genCourier() {
+  const date = document.getElementById('ddate').value;
+  const day = orders.filter(o=>o.deliveryDate===date&&!o.archived);
+  if(!day.length){alert('Load deliveries first.');return;}
+  const total = day.reduce((s,o)=>s+(o.totalPrice||0),0);
+  let m = `*NatuRaw — ${fd(date)}*\n${day.length} stop${day.length>1?'s':''}\n─────────────────────`;
+  day.forEach((o,i) => {
+    const pr = Object.entries(op(o)).filter(([,v])=>v>0).map(([k,v])=>`${v}x ${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}`).join(', ');
+    m += `\n\n*${i+1}. ${o.customer||'—'}*\n${o.address||o.area||'Address TBC'}`;
+    if(o.phone) m += `\n${o.phone}`;
+    m += `\n${pr||'—'}`;
+    if(o.notes) m += `\n_Note: ${o.notes}_`;
+    m += `\nEGP ${(o.totalPrice||0).toLocaleString()} — ${o.paymentMethod||'Cash'} — ${o.paid?'PAID':'COLLECT'}`;
+  });
+  m += `\n\n─────────────────────\n${day.length} stop${day.length>1?'s':''} · EGP ${total.toLocaleString()} to collect`;
+  document.getElementById('dctext').textContent = m;
+  document.getElementById('dcourier').style.display = 'block';
+}
+
+// ─── INVOICE ───────────────────────────────────────────────────────────────
+function genInvoice() {
+  const sel = document.getElementById('isel').value; if(!sel){alert('Select an order.');return;}
+  const o = orders.find(x=>x.id===sel); if(!o) return;
+  const num = o.invoiceNumber || o.orderId;
+  const lines = Object.entries(op(o)).filter(([,v])=>v>0).map(([k,v])=>({name:k,qty:v,unit:px(k),total:px(k)>0?v*px(k):null,tbd:px(k)===0}));
+  const cT = lines.filter(l=>!l.tbd).reduce((s,l)=>s+l.total,0);
+  const total = o.totalPrice||cT;
+  let inv = `*NatuRaw — Invoice*\n━━━━━━━━━━━━━━━━━━━━━━\nInvoice No: ${num}\nDate: ${new Date().toLocaleDateString('en-GB')}\nDelivery: ${o.deliveryDate?fd(o.deliveryDate):'—'}\n━━━━━━━━━━━━━━━━━━━━━━\nCustomer: ${o.customer||'—'}\n`;
+  if(o.phone) inv += `Phone: ${o.phone}\n`;
+  if(o.address) inv += `Address: ${o.address}\n`;
+  inv += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  lines.forEach(l => { if(l.tbd) inv+=`${l.qty}x ${l.name} (price TBD)\n`; else inv+=`${l.qty}x ${l.name}\n   EGP ${l.unit.toLocaleString()} x ${l.qty} = EGP ${l.total.toLocaleString()}\n`; });
+  inv += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  if(lines.some(l=>l.tbd)) inv += `_Some prices pending_\n`;
+  inv += `*Total: EGP ${total.toLocaleString()}*\nPayment: ${o.paymentMethod||'—'}`;
+  if(!o.paid) inv += `\n\n_Payment pending_`;
+  inv += `\n\nThank you for choosing NatuRaw! 🐾`;
+  document.getElementById('itext').textContent = inv;
+  document.getElementById('iout').style.display = 'block';
+}
+
+// ─── NEW ORDER ─────────────────────────────────────────────────────────────
+async function submitOrder() {
+  const cid = document.getElementById('ncust').value;
+  const dd = document.getElementById('ndd').value;
+  if(!cid||!dd){alert('Customer and delivery date required.');return;}
+  const od = document.getElementById('nod').value||dd;
+  const pay = document.getElementById('npay').value;
+  const standing = document.getElementById('nstand').checked;
+  const freq = document.getElementById('nfreq').value;
+  const total = parseFloat(document.getElementById('ntotal').value)||0;
+  const notes = document.getElementById('nnotes').value||'';
+  const oid = `NR-${dd.replace(/-/g,'')}-${String(Math.floor(Math.random()*900)+100)}`;
+  const msg = document.getElementById('nmsg');
+  msg.className='sm ld'; msg.textContent='Creating...';
+
+  const props = {
+    'Order ID': { title: [{text:{content:oid}}] },
+    'Customer': { relation: [{id:cid}] },
+    'Order Date': { date: {start:od} },
+    'Delivery Date': { date: {start:dd} },
+    'Status': { select: {name:'New'} },
+    'Payment Method': { select: {name:pay} },
+    'Total Price': { number: total },
+    'Paid?': { checkbox: false },
+    'Standing Order': { checkbox: standing },
+    'Notes': { rich_text: [{text:{content:notes}}] },
+    'Beef Dinner 300': { number: iv('p_Beef_Dinner_300') },
+    'Beef Dinner 500': { number: iv('p_Beef_Dinner_500') },
+    'Chicken Dinner 300': { number: iv('p_Chicken_Dinner_300') },
+    'Chicken Dinner 500': { number: iv('p_Chicken_Dinner_500') },
+    'Rabbit Dinner 300': { number: iv('p_Rabbit_Dinner_300') },
+    'Rabbit Dinner 500': { number: iv('p_Rabbit_Dinner_500') },
+    'Duck Dinner 300': { number: iv('p_Duck_Dinner_300') },
+    'Duck Dinner 500': { number: iv('p_Duck_Dinner_500') },
+    'Bone': { number: iv('p_Bone') },
+    'Daily Boost': { number: iv('p_Daily_Boost') }
+  };
+  if(standing) props['Standing Frequency'] = { select: {name:freq} };
+
+  try {
+    await nPost('/pages', { parent:{database_id:DB_ORDERS}, properties:props });
+    msg.className='sm ok'; msg.textContent=`Created: ${oid}`;
+    PKEYS.forEach(k=>{const el=document.getElementById('p_'+k.replace(/ /g,'_'));if(el)el.value=0;});
+    document.getElementById('ntotal').value='';
+    document.getElementById('nnotes').value='';
+    document.getElementById('nstand').checked=false;
+    document.getElementById('nfreqw').style.display='none';
+    await loadAll();
+  } catch(e) {
+    msg.className='sm er'; msg.textContent='Failed: '+e.message;
+    console.error(e);
+  }
+}
+
+// ─── STANDING ──────────────────────────────────────────────────────────────
+function renderStanding() {
+  const st = orders.filter(o=>o.standingOrder&&!o.archived);
+  const el = document.getElementById('stcontent');
+  if(!st.length){el.innerHTML='<p class="hint">No standing orders.</p>';return;}
+  let h='<div class="card"><div style="overflow-x:auto"><table><thead><tr><th>Order ID</th><th>Customer</th><th>Frequency</th><th>Next delivery</th><th>Items</th><th>Total</th></tr></thead><tbody>';
+  [...st].sort((a,b)=>(a.nextRecurrenceDate||'9999').localeCompare(b.nextRecurrenceDate||'9999')).forEach(o=>{
+    h+=`<tr><td style="font-family:var(--mono);font-size:11px">${o.orderId||'—'}</td><td>${o.customer||'—'}</td><td><span class="badge bstand">${o.standingFrequency||'—'}</span></td><td>${o.nextRecurrenceDate?fd(o.nextRecurrenceDate):'—'}</td><td style="font-size:12px">${fp(op(o))}</td><td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td></tr>`;
+  });
+  h+='</tbody></table></div></div>';
+  el.innerHTML=h;
+}
+
+// ─── SALES ─────────────────────────────────────────────────────────────────
+function renderSales() {
+  const per=document.getElementById('speriod')?.value||'all', now=new Date();
+  let f=orders.filter(o=>!o.archived&&o.totalPrice>0);
+  if(per==='month'){const m=now.toISOString().slice(0,7);f=f.filter(o=>(o.deliveryDate||'').startsWith(m));}
+  else if(per==='last30'){const c=new Date(now-30*864e5).toISOString().slice(0,10);f=f.filter(o=>(o.deliveryDate||'')>=c);}
+  else if(per==='year'){f=f.filter(o=>(o.deliveryDate||'').startsWith(now.getFullYear()+''));}
+  const rev=f.reduce((s,o)=>s+(o.totalPrice||0),0), cnt=f.length, paid=f.filter(o=>o.paid).length, avg=cnt?Math.round(rev/cnt):0;
+  const pt={};f.forEach(o=>PKEYS.forEach(k=>{const v=op(o)[k]||0;if(v>0)pt[k]=(pt[k]||0)+v;}));
+  const tp=Object.entries(pt).sort((a,b)=>b[1]-a[1]).slice(0,6), mq=tp[0]?.[1]||1;
+  const cr={};f.forEach(o=>{if(o.customer)cr[o.customer]=(cr[o.customer]||0)+(o.totalPrice||0);});
+  const tc=Object.entries(cr).sort((a,b)=>b[1]-a[1]).slice(0,5), mc=tc[0]?.[1]||1;
+  let h=`<div class="mg"><div class="m"><div class="ml">Revenue</div><div class="mv" style="font-size:17px">EGP ${rev.toLocaleString()}</div></div><div class="m"><div class="ml">Orders</div><div class="mv">${cnt}</div></div><div class="m"><div class="ml">Avg order</div><div class="mv" style="font-size:17px">EGP ${avg.toLocaleString()}</div></div><div class="m"><div class="ml">Paid</div><div class="mv">${Math.round(paid/Math.max(cnt,1)*100)}%</div><div class="ms">${paid}/${cnt}</div></div></div>`;
+  if(tp.length){h+=`<div class="card"><div class="ct">Units sold</div>`;tp.forEach(([k,q])=>{h+=`<div class="br"><div class="bl">${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}</div><div class="btr"><div class="bfl" style="width:${Math.round(q/mq*100)}%;background:var(--teal)"></div></div><div class="bvl">${q}</div></div>`;});h+='</div>';}
+  if(tc.length){h+=`<div class="card"><div class="ct">Top customers</div>`;tc.forEach(([n,r])=>{h+=`<div class="br"><div class="bl">${n}</div><div class="btr"><div class="bfl" style="width:${Math.round(r/mc*100)}%;background:var(--teal2)"></div></div><div class="bvl">EGP ${(Math.round(r/100)/10).toFixed(1)}k</div></div>`;});h+='</div>';}
+  if(!cnt)h+='<p class="hint">No data for this period.</p>';
+  document.getElementById('scontent').innerHTML=h;
+}
+
+// ─── PRICING ───────────────────────────────────────────────────────────────
+function renderPricing() {
+  const el=document.getElementById('prcontent');
+  if(!products.length){el.innerHTML='<p class="hint">No products. Check Products & Pricing is connected to the integration.</p>';return;}
+  let h='<div style="overflow-x:auto"><table><thead><tr><th>SKU</th><th>Product</th><th>Price (EGP)</th><th>Cost (EGP)</th></tr></thead><tbody>';
+  [...products].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{
+    const pr=p.price>0?`EGP ${p.price}`:`<span class="badge btbd">TBD</span>`;
+    const cost=p.cost>0?`EGP ${p.cost}`:`<span style="color:var(--text3)">—</span>`;
+    h+=`<tr><td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${p.sku||'—'}</td><td>${p.name}</td><td>${pr}</td><td>${cost}</td></tr>`;
+  });
+  h+='</tbody></table></div><p style="font-size:12px;color:var(--text3);margin-top:0.75rem;">Edit prices directly in Notion, then click Sync.</p>';
+  el.innerHTML=h;
+}
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────
+function iv(id){return parseInt(document.getElementById(id)?.value)||0;}
+function fd(d){if(!d)return'—';const[y,m,day]=d.split('-');return `${parseInt(day)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]} ${y}`;}
+function fp(p){return Object.entries(p).filter(([,v])=>v>0).map(([k,v])=>`${v}x ${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}`).join(', ');}
+function bfor(s){const m={'New':'bn','Preparing':'bprep','Out for Delivery':'bout','Delivered':'bdone'};return `<span class="badge ${m[s]||'bn'}">${s||'New'}</span>`;}
+function cp(id,btn){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>{const o=btn.textContent;btn.textContent='Copied!';setTimeout(()=>btn.textContent=o,1500);});}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
+const today=new Date().toISOString().slice(0,10);
+document.getElementById('ddate').value=today;
+document.getElementById('ndd').value=today;
+document.getElementById('nod').value=today;
+loadAll();
+</script>
+</body>
+</html>

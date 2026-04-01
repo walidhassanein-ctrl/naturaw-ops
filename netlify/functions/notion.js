@@ -23,48 +23,57 @@ exports.handler = async function(event) {
     };
   }
 
-  const path = (event.queryStringParameters && event.queryStringParameters.path) || '';
-  const notionUrl = 'https://api.notion.com/v1' + path;
-  const parsedUrl = new URL(notionUrl);
+  try {
+    const path = (event.queryStringParameters && event.queryStringParameters.path) || '';
+    const notionUrl = 'https://api.notion.com/v1' + path;
+    const parsedUrl = new URL(notionUrl);
 
-  const reqOptions = {
-    hostname: parsedUrl.hostname,
-    path: parsedUrl.pathname + parsedUrl.search,
-    method: event.httpMethod,
-    headers: {
-      'Authorization': 'Bearer ' + NOTION_TOKEN,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json'
-    }
-  };
+    const reqOptions = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: event.httpMethod,
+      headers: {
+        'Authorization': 'Bearer ' + NOTION_TOKEN,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      }
+    };
 
-  return new Promise((resolve) => {
-    const req = https.request(reqOptions, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        resolve({
-          statusCode: res.statusCode,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: data
+    return await new Promise((resolve) => {
+      const req = https.request(reqOptions, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            },
+            body: data
+          });
         });
       });
-    });
 
-    req.on('error', (err) => {
-      resolve({
-        statusCode: 500,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: err.message })
+      req.on('error', (err) => {
+        resolve({
+          statusCode: 500,
+          headers: { 'Access-Control-Allow-Origin': '*' },
+          body: JSON.stringify({ error: 'Request failed', detail: err.message, stack: err.stack })
+        });
       });
+
+      if (event.body && event.httpMethod !== 'GET') {
+        req.write(event.body);
+      }
+      req.end();
     });
 
-    if (event.body && event.httpMethod !== 'GET') {
-      req.write(event.body);
-    }
-    req.end();
-  });
+  } catch(err) {
+    return {
+      statusCode: 500,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ error: 'Handler failed', detail: err.message, stack: err.stack })
+    };
+  }
 };

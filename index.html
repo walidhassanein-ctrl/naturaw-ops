@@ -265,7 +265,7 @@ async function queryDB(dbId, filter) {
 }
 
 // ─── PROP HELPERS ──────────────────────────────────────────────────────────
-const pTxt = (p, n) => { const x = p.properties[n]; if (!x) return null; if (x.type==='title') return x.title?.map(t=>t.plain_text).join('')||null; if (x.type==='rich_text') return x.rich_text?.map(t=>t.plain_text).join('')||null; if (x.type==='select') return x.select?.name||null; if (x.type==='phone_number') return x.phone_number||null; return null; };
+const pTxt = (p, n) => { const x = p.properties[n]; if (!x) return null; if (x.type==='title') return x.title?.map(t=>t.plain_text).join('')||null; if (x.type==='rich_text') return x.rich_text?.map(t=>t.plain_text).join('')||null; if (x.type==='select') return x.select?.name||null; if (x.type==='phone_number') return x.phone_number||null; if (x.type==='url') return x.url||null; return null; };
 const pNum = (p, n) => p.properties[n]?.number ?? 0;
 const pBool = (p, n) => p.properties[n]?.checkbox ?? false;
 const pDate = (p, n) => p.properties[n]?.date?.start || null;
@@ -295,7 +295,8 @@ async function loadAll() {
       name: pTxt(c,'Customer') || pTxt(c,'Name') || '—',
       phone: pTxt(c,'Phone'),
       address: pTxt(c,'Address'),
-      area: pTxt(c,'Area / Zone')
+      area: pTxt(c,'Area / Zone'),
+      location: pTxt(c,'Location')
     }));
 
     const cMap = {};
@@ -311,6 +312,7 @@ async function loadAll() {
         phone: cust?.phone || null,
         address: cust?.address || null,
         area: cust?.area || null,
+        location: cust?.location || null,
         orderDate: pDate(o,'Order Date'),
         deliveryDate: pDate(o,'Delivery Date'),
         status: pTxt(o,'Status') || 'New',
@@ -400,6 +402,7 @@ function genCourier() {
   day.forEach((o,i) => {
     const pr = Object.entries(op(o)).filter(([,v])=>v>0).map(([k,v])=>`${v}x ${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}`).join(', ');
     m += `\n\n*${i+1}. ${o.customer||'—'}*\n${o.address||o.area||'Address TBC'}`;
+    if(o.location) m += `\n${o.location}`;
     if(o.phone) m += `\n${o.phone}`;
     m += `\n${pr||'—'}`;
     if(o.notes) m += `\n_Note: ${o.notes}_`;

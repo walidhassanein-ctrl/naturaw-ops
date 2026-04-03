@@ -164,6 +164,9 @@ input:focus, select:focus { border-color: var(--border3); }
         <div><label>Payment method</label>
           <select id="npay"><option>Cash</option><option>Instapay</option><option>Vodafone Cash</option><option>Transfer</option></select>
         </div>
+        <div><label>Delivery charge</label>
+          <select id="ndelivcharge"><option value="None">None</option><option value="50">EGP 50</option><option value="100">EGP 100</option></select>
+        </div>
         <div class="full">
           <div class="sep">Products</div>
           <div id="npg" class="pg"></div>
@@ -334,6 +337,7 @@ async function loadAll() {
         standingFrequency: pTxt(o,'Standing Frequency'),
         nextRecurrenceDate: pDate(o,'Next Recurrence Date'),
         notes: pTxt(o,'Notes'),
+        deliveryCharge: pTxt(o,'Delivery Charge (EGP)'),
         archived: pBool(o,'Archived'),
         b300: pNum(o,'Beef Dinner 300'), b500: pNum(o,'Beef Dinner 500'),
         c300: pNum(o,'Chicken Dinner 300'), c500: pNum(o,'Chicken Dinner 500'),
@@ -459,7 +463,10 @@ function genInvoice() {
   lines.forEach(l => { if(l.tbd) inv+=`${l.qty}x ${l.name} (price TBD)\n`; else inv+=`${l.qty}x ${l.name}\n   EGP ${l.unit.toLocaleString()} x ${l.qty} = EGP ${l.total.toLocaleString()}\n`; });
   inv += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   if(lines.some(l=>l.tbd)) inv += `_Some prices pending_\n`;
-  inv += `*Total: EGP ${total.toLocaleString()}*\nPayment: ${o.paymentMethod||'—'}`;
+  const dc = o.deliveryCharge && o.deliveryCharge !== 'None' ? parseInt(o.deliveryCharge) : 0;
+  const grandTotal = total + dc;
+  if(dc > 0) inv += `Subtotal: EGP ${total.toLocaleString()}\nDelivery: EGP ${dc}\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+  inv += `*Total: EGP ${grandTotal.toLocaleString()}*\nPayment: ${o.paymentMethod||'—'}`;
   if(!o.paid) inv += `\n\n_Payment pending_`;
   inv += `\n\nThank you for choosing NatuRaw! 🐾`;
   document.getElementById('itext').textContent = inv;
@@ -492,6 +499,7 @@ async function submitOrder() {
     'Paid?': { checkbox: false },
     'Standing Order': { checkbox: standing },
     'Notes': { rich_text: [{text:{content:notes}}] },
+    'Delivery Charge (EGP)': { select: {name: document.getElementById('ndelivcharge').value} },
     'Beef Dinner 300': { number: iv('p_Beef_Dinner_300') },
     'Beef Dinner 500': { number: iv('p_Beef_Dinner_500') },
     'Chicken Dinner 300': { number: iv('p_Chicken_Dinner_300') },

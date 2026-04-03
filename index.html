@@ -121,6 +121,7 @@ input:focus, select:focus { border-color: var(--border3); }
     <button onclick="showTab('neworder',this)">New order</button>
     <button onclick="showTab('standing',this)">Standing orders</button>
     <button onclick="showTab('sales',this)">Sales</button>
+    <button onclick="showTab('inventory',this)">Inventory</button>
     <button onclick="showTab('pricing',this)">Pricing</button>
   </div>
 
@@ -201,6 +202,11 @@ input:focus, select:focus { border-color: var(--border3); }
     <div id="scontent"><p class="hint">Loading...</p></div>
   </div>
 
+  <!-- INVENTORY -->
+  <div id="tab-inventory" class="tab">
+    <div id="inv-content"><p class="hint">Loading...</p></div>
+  </div>
+
   <!-- PRICING -->
   <div id="tab-pricing" class="tab">
     <div class="card">
@@ -216,6 +222,8 @@ input:focus, select:focus { border-color: var(--border3); }
 const DB_ORDERS    = '308bd212-68bb-802b-a88c-c5ed3bb0bffa';
 const DB_CUSTOMERS = 'ae8d6fc0-333a-4a93-b09d-564d267377f5';
 const DB_PRODUCTS  = '33332c20-c289-49dc-83ae-8406b07b1e6b';
+const DB_STOCK     = '5ca011a9-c00c-4b9c-9fe5-a86b44a70497';
+const DB_MATERIALS = 'c0c76d91-d151-4ad0-8234-4b3bd65e6a5d';
 
 // Proxy endpoint (routes through Netlify function)
 const PROXY = 'https://lucky-silence-1f1e.walid-hassanein.workers.dev';
@@ -232,7 +240,7 @@ const PNAME = {
 };
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
-let orders = [], customers = [], products = [];
+let orders = [], customers = [], products = [], stock = [], materials = [];
 
 // ─── API ───────────────────────────────────────────────────────────────────
 async function nGet(path) {
@@ -275,10 +283,12 @@ const pRel = (p, n) => (p.properties[n]?.relation || []).map(r => r.id);
 async function loadAll() {
   setSL('Syncing...', true);
   try {
-    const [rawO, rawC, rawP] = await Promise.all([
+    const [rawO, rawC, rawP, rawS, rawM] = await Promise.all([
       queryDB(DB_ORDERS),
       queryDB(DB_CUSTOMERS),
-      queryDB(DB_PRODUCTS)
+      queryDB(DB_PRODUCTS),
+      queryDB(DB_STOCK),
+      queryDB(DB_MATERIALS)
     ]);
 
     products = rawP.map(p => ({
@@ -333,6 +343,27 @@ async function loadAll() {
       };
     });
 
+    stock = rawS.map(s => ({
+      id: s.id,
+      product: pTxt(s,'Product') || '',
+      protein: pTxt(s,'Protein') || '',
+      size: pTxt(s,'Size') || '',
+      packs: pNum(s,'Packs in Stock'),
+      batchDate: pDate(s,'Batch Date'),
+      notes: pTxt(s,'Notes')
+    }));
+
+    materials = rawM.map(m => ({
+      id: m.id,
+      ingredient: pTxt(m,'Ingredient') || '',
+      category: pTxt(m,'Category') || '',
+      inStock: pNum(m,'In Stock (kg)'),
+      lastRestocked: pDate(m,'Last Restocked'),
+      costPerKg: pNum(m,'Cost per kg (EGP)'),
+      typicalPurchase: pNum(m,'Typical Purchase (kg)'),
+      notes: pTxt(m,'Supplier Notes')
+    }));
+
     setSL(`Synced ${orders.length} orders · ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`);
     populateUI();
   } catch(e) {
@@ -356,7 +387,7 @@ function populateUI() {
   [...orders].filter(o=>!o.archived).sort((a,b)=>(b.deliveryDate||'').localeCompare(a.deliveryDate||'')).forEach(o => {
     is.innerHTML += `<option value="${o.id}">${o.orderId||o.id.slice(0,8)} — ${o.customer||'?'} (${o.deliveryDate||'—'})</option>`;
   });
-  buildPG(); renderPricing(); renderStanding(); renderSales();
+  buildPG(); renderPricing(); renderStanding(); renderSales(); renderInventory();
 }
 
 function buildPG() {
@@ -533,6 +564,106 @@ function renderPricing() {
   });
   h+='</tbody></table></div><p style="font-size:12px;color:var(--text3);margin-top:0.75rem;">Edit prices directly in Notion, then click Sync.</p>';
   el.innerHTML=h;
+}
+
+// ─── INVENTORY ─────────────────────────────────────────────────────────────
+function renderInventory() {
+  const el = document.getElementById('inv-content');
+
+  // Unfulfilled orders = New or Preparing
+  const unfulfilled = orders.filter(o => !o.archived && (o.status === 'New' || o.status === 'Preparing'));
+
+  // Sum up what's needed by product key
+  const needed = {};
+  const DKEYS = ['Beef Dinner 300','Beef Dinner 500','Chicken Dinner 300','Chicken Dinner 500',
+                 'Rabbit Dinner 300','Rabbit Dinner 500','Duck Dinner 300','Duck Dinner 500'];
+  DKEYS.forEach(k => needed[k] = 0);
+  unfulfilled.forEach(o => {
+    const p = op(o);
+    DKEYS.forEach(k => { needed[k] += p[k] || 0; });
+  });
+
+  // Map stock to product keys
+  const onHand = {};
+  DKEYS.forEach(k => onHand[k] = 0);
+  stock.forEach(s => {
+    const key = s.protein + ' Dinner ' + s.size.replace('g','');
+    if (onHand[key] !== undefined) onHand[key] += s.packs || 0;
+  });
+
+  // Build shortfall table
+  const rows = DKEYS.map(k => ({
+    key: k,
+    label: k.replace(' Dinner',' ').replace(' 300',' 300g').replace(' 500',' 500g'),
+    onHand: onHand[k],
+    needed: needed[k],
+    shortfall: Math.max(0, needed[k] - onHand[k]),
+    surplus: Math.max(0, onHand[k] - needed[k])
+  })).filter(r => r.onHand > 0 || r.needed > 0);
+
+  let h = '';
+
+  // Summary metrics
+  const totalShortfall = rows.reduce((s,r) => s + r.shortfall, 0);
+  const totalSurplus = rows.reduce((s,r) => s + r.surplus, 0);
+  const unfulfilledCount = unfulfilled.length;
+
+  h += `<div class="mg">
+    <div class="m"><div class="ml">Unfulfilled orders</div><div class="mv">${unfulfilledCount}</div></div>
+    <div class="m"><div class="ml">Packs short</div><div class="mv" style="color:${totalShortfall>0?'var(--red)':'var(--green)'}">${totalShortfall}</div></div>
+    <div class="m"><div class="ml">Surplus packs</div><div class="mv">${totalSurplus}</div></div>
+  </div>`;
+
+  // Stock vs orders table
+  if (rows.length) {
+    h += `<div class="card"><div class="ct">Prepared stock vs unfulfilled orders</div>
+    <table><thead><tr><th>Product</th><th>In freezer</th><th>Orders pending</th><th>Shortfall</th><th>Surplus</th></tr></thead><tbody>`;
+    rows.forEach(r => {
+      const shortColor = r.shortfall > 0 ? 'color:var(--red);font-weight:500' : 'color:var(--text3)';
+      const surpColor = r.surplus > 0 ? 'color:var(--green);font-weight:500' : 'color:var(--text3)';
+      h += `<tr>
+        <td>${r.label}</td>
+        <td>${r.onHand}</td>
+        <td>${r.needed}</td>
+        <td style="${shortColor}">${r.shortfall > 0 ? '−' + r.shortfall : '—'}</td>
+        <td style="${surpColor}">${r.surplus > 0 ? '+' + r.surplus : '—'}</td>
+      </tr>`;
+    });
+    h += '</tbody></table></div>';
+  } else {
+    h += `<div class="card"><div class="ct">Prepared stock vs unfulfilled orders</div><p class="hint" style="padding:1rem">No stock or pending orders yet. Update your Prepared Stock table in Notion.</p></div>`;
+  }
+
+  // What to make (batches needed)
+  const toMake = rows.filter(r => r.shortfall > 0);
+  if (toMake.length) {
+    h += `<div class="card"><div class="ct">What to make</div>
+    <table><thead><tr><th>Product</th><th>Packs needed</th><th>Kg needed</th><th>Batches (5kg)</th></tr></thead><tbody>`;
+    toMake.forEach(r => {
+      const kgPerPack = r.key.includes('300') ? 0.3 : 0.5;
+      const kgNeeded = r.shortfall * kgPerPack;
+      const batches = Math.ceil(kgNeeded / 5);
+      h += `<tr><td>${r.label}</td><td style="color:var(--red);font-weight:500">${r.shortfall}</td><td>${kgNeeded.toFixed(1)} kg</td><td>${batches}</td></tr>`;
+    });
+    h += '</tbody></table></div>';
+  }
+
+  // Raw materials
+  h += `<div class="card"><div class="ct">Raw materials on hand</div>`;
+  if (materials.length) {
+    h += `<table><thead><tr><th>Ingredient</th><th>Category</th><th>In stock (kg)</th><th>Last restocked</th></tr></thead><tbody>`;
+    [...materials].sort((a,b) => a.category.localeCompare(b.category) || a.ingredient.localeCompare(b.ingredient)).forEach(m => {
+      const stockColor = m.inStock === 0 ? 'color:var(--red)' : m.inStock < 2 ? 'color:var(--amber)' : 'color:var(--green)';
+      h += `<tr><td>${m.ingredient}</td><td style="font-size:12px;color:var(--text2)">${m.category}</td><td style="${stockColor};font-weight:500">${m.inStock > 0 ? m.inStock + ' kg' : '—'}</td><td style="font-size:12px;color:var(--text2)">${m.lastRestocked ? fd(m.lastRestocked) : '—'}</td></tr>`;
+    });
+    h += '</tbody></table>';
+    h += `<p style="font-size:12px;color:var(--text3);margin-top:0.75rem;">Update stock levels directly in the Raw Materials Notion table.</p>`;
+  } else {
+    h += `<p class="hint" style="padding:1rem">No materials found.</p>`;
+  }
+  h += '</div>';
+
+  el.innerHTML = h;
 }
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────

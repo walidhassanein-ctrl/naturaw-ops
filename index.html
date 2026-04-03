@@ -328,7 +328,7 @@ async function loadAll() {
         location: cust?.location || null,
         orderDate: pDate(o,'Order Date'),
         deliveryDate: pDate(o,'Delivery Date'),
-        status: pTxt(o,'Status') || 'New',
+        status: pTxt(o,'Status') || null,
         paid: pBool(o,'Paid?'),
         paymentMethod: pTxt(o,'Payment Method'),
         totalPrice: pNum(o,'Total Price') || null,

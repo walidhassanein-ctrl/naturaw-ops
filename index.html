@@ -465,7 +465,12 @@ function genCourier() {
     const isCashCollect = o.paymentMethod === 'Cash' && !o.paid;
     if(isCashCollect) m += `\nEGP ${courierTotal.toLocaleString()} — CASH TO COLLECT`;
   });
-  m += `\n\n─────────────────────\n${day.length} stop${day.length>1?'s':''} · EGP ${total.toLocaleString()} to collect`;
+  const cashTotal = day.filter(o=>o.paymentMethod==='Cash'&&!o.paid).reduce((s,o)=>{
+    const dc=o.deliveryCharge&&o.deliveryCharge!=='None'?parseInt(o.deliveryCharge):0;
+    return s+(o.totalPrice||0)+dc;
+  },0);
+  m += `\n\n─────────────────────\n${day.length} stop${day.length>1?'s':''}`;
+  if(cashTotal>0) m += ` · EGP ${cashTotal.toLocaleString()} cash to collect`;
   document.getElementById('dctext').textContent = m;
   document.getElementById('dcourier').style.display = 'block';
 }

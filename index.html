@@ -226,6 +226,7 @@ const DB_ORDERS    = '308bd212-68bb-802b-a88c-c5ed3bb0bffa';
 const DB_CUSTOMERS = 'ae8d6fc0-333a-4a93-b09d-564d267377f5';
 const DB_PRODUCTS  = '33332c20-c289-49dc-83ae-8406b07b1e6b';
 const DB_STOCK     = '5ca011a9-c00c-4b9c-9fe5-a86b44a70497';
+const DB_DOGS      = '308bd212-68bb-802a-a82d-000b0cdb352a';
 const DB_MATERIALS = 'c0c76d91-d151-4ad0-8234-4b3bd65e6a5d';
 
 // Proxy endpoint (routes through Netlify function)
@@ -292,7 +293,7 @@ async function loadAll() {
       queryDB(DB_PRODUCTS),
       queryDB(DB_STOCK),
       queryDB(DB_MATERIALS),
-      queryDB('308bd212-68bb-80e2-8609-ee0e3e10827e')
+      queryDB(DB_DOGS)
     ]);
 
     products = rawP.map(p => ({
@@ -501,6 +502,8 @@ async function submitOrder() {
   const dd = document.getElementById('ndd').value;
   if(!cid||!dd){alert('Customer and delivery date required.');return;}
   const od = document.getElementById('nod').value||dd;
+  // Auto-link customer's dogs
+  const custDogs = dogs.filter(d => d.customerIds.includes(cid));
   const pay = document.getElementById('npay').value;
   const standing = document.getElementById('nstand').checked;
   const freq = document.getElementById('nfreq').value;
@@ -521,6 +524,7 @@ async function submitOrder() {
     'Paid?': { checkbox: false },
     'Standing Order': { checkbox: standing },
     'Notes': { rich_text: [{text:{content:notes}}] },
+    ...(custDogs.length ? {'Dogs': { relation: custDogs.map(d => ({id: d.id})) }} : {}),
     'Delivery Charge (EGP)': { select: {name: document.getElementById('ndelivcharge').value} },
     'Beef Dinner 300': { number: iv('p_Beef_Dinner_300') },
     'Beef Dinner 500': { number: iv('p_Beef_Dinner_500') },

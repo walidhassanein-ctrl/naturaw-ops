@@ -453,12 +453,16 @@ function genCourier() {
   let m = `*NatuRaw — ${fd(date)}*\n${day.length} stop${day.length>1?'s':''}\n─────────────────────`;
   day.forEach((o,i) => {
     const pr = Object.entries(op(o)).filter(([,v])=>v>0).map(([k,v])=>`${v}x ${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}`).join(', ');
-    m += `\n\n*${i+1}. ${o.customer||'—'}*\n${o.address||o.area||'Address TBC'}`;
+    const dogStr = o.dogNames && o.dogNames.length ? ' — ' + o.dogNames.map(n=>n.toUpperCase()).join(', ') : '';
+    m += `\n\n*${i+1}. ${o.customer||'—'}${dogStr}*\n${o.address||o.area||'Address TBC'}`;
     if(o.location) m += `\n${o.location}`;
     if(o.phone) m += `\n${o.phone}`;
     m += `\n${pr||'—'}`;
     if(o.notes) m += `\n_Note: ${o.notes}_`;
-    m += `\nEGP ${(o.totalPrice||0).toLocaleString()} — ${o.paymentMethod||'Cash'} — ${o.paid?'PAID':'COLLECT'}`;
+    const dc2 = o.deliveryCharge && o.deliveryCharge !== 'None' ? parseInt(o.deliveryCharge) : 0;
+    const courierTotal = (o.totalPrice||0) + dc2;
+    const isCashCollect = o.paymentMethod === 'Cash' && !o.paid;
+    if(isCashCollect) m += `\nEGP ${courierTotal.toLocaleString()} — CASH TO COLLECT`;
   });
   m += `\n\n─────────────────────\n${day.length} stop${day.length>1?'s':''} · EGP ${total.toLocaleString()} to collect`;
   document.getElementById('dctext').textContent = m;

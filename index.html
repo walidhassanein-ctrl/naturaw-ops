@@ -243,7 +243,7 @@ const PNAME = {
 };
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
-let orders = [], customers = [], products = [], stock = [], materials = [];
+let orders = [], customers = [], products = [], stock = [], materials = [], dogs = [];
 
 // ─── API ───────────────────────────────────────────────────────────────────
 async function nGet(path) {
@@ -286,12 +286,13 @@ const pRel = (p, n) => (p.properties[n]?.relation || []).map(r => r.id);
 async function loadAll() {
   setSL('Syncing...', true);
   try {
-    const [rawO, rawC, rawP, rawS, rawM] = await Promise.all([
+    const [rawO, rawC, rawP, rawS, rawM, rawD] = await Promise.all([
       queryDB(DB_ORDERS),
       queryDB(DB_CUSTOMERS),
       queryDB(DB_PRODUCTS),
       queryDB(DB_STOCK),
-      queryDB(DB_MATERIALS)
+      queryDB(DB_MATERIALS),
+      queryDB('308bd212-68bb-80e2-8609-ee0e3e10827e')
     ]);
 
     products = rawP.map(p => ({
@@ -338,6 +339,7 @@ async function loadAll() {
         nextRecurrenceDate: pDate(o,'Next Recurrence Date'),
         notes: pTxt(o,'Notes'),
         deliveryCharge: pTxt(o,'Delivery Charge (EGP)'),
+        dogIds: pRel(o,'Dogs'),
         archived: pBool(o,'Archived'),
         b300: pNum(o,'Beef Dinner 300'), b500: pNum(o,'Beef Dinner 500'),
         c300: pNum(o,'Chicken Dinner 300'), c500: pNum(o,'Chicken Dinner 500'),
@@ -367,6 +369,21 @@ async function loadAll() {
       typicalPurchase: pNum(m,'Typical Purchase (kg)'),
       notes: pTxt(m,'Supplier Notes')
     }));
+
+    dogs = rawD.map(d => ({
+      id: d.id,
+      name: pTxt(d,'Dog Name') || '',
+      customerIds: pRel(d,'Customer')
+    }));
+
+    // Build dog lookup by id
+    const dogMap = {};
+    dogs.forEach(d => dogMap[d.id] = d);
+
+    // Link dog names into orders
+    orders.forEach(o => {
+      o.dogNames = (o.dogIds || []).map(id => dogMap[id]?.name).filter(Boolean);
+    });
 
     setSL(`Synced ${orders.length} orders · ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`);
     populateUI();
@@ -467,6 +484,7 @@ function genInvoice() {
   const grandTotal = total + dc;
   if(dc > 0) inv += `Subtotal: EGP ${total.toLocaleString()}\nDelivery: EGP ${dc}\n━━━━━━━━━━━━━━━━━━━━━━\n`;
   inv += `*Total: EGP ${grandTotal.toLocaleString()}*\nPayment: ${o.paymentMethod||'—'}`;
+  if(o.paymentMethod === 'Instapay') inv += `\nInstapay to: 01013521051`;
   if(!o.paid) inv += `\n\n_Payment pending_`;
   inv += `\n\nThank you for choosing NatuRaw! 🐾`;
   document.getElementById('itext').textContent = inv;

@@ -592,20 +592,23 @@ function renderStanding() {
       <td>${nextFormatted}</td>
       <td style="font-size:12px">${fp(op(o))}</td>
       <td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td>
-      <td><button class="btn" style="font-size:12px;padding:5px 10px;white-space:nowrap" onclick="genNextOrder('${o.id}',this)">Generate next</button></td>
+      <td><button class="btn" style="font-size:12px;padding:5px 10px;white-space:nowrap" data-orderid="${o.id}" onclick="genNextOrder(event)">Generate next</button></td>
     </tr>`;
   });
   h+='</tbody></table></div></div>';
   el.innerHTML=h;
 }
 
-async function genNextOrder(orderId, btn) {
+async function genNextOrder(event) {
+  const btn = event.currentTarget;
+  const orderId = btn.dataset.orderid;
   const o = orders.find(x=>x.id===orderId);
   if (!o) return;
   if (!o.standingFrequency) { alert('No frequency set on this order. Update it in Notion first.'); return; }
 
+  // Use nextRecurrenceDate if set, otherwise fall back to deliveryDate
   const baseDate = o.nextRecurrenceDate || o.deliveryDate;
-  if (!baseDate) { alert('No delivery date to calculate from. Set a Next Recurrence Date in Notion first.'); return; }
+  if (!baseDate) { alert('No delivery date found on this order.'); return; }
 
   const newDelivDate = calcNextDate(baseDate, o.standingFrequency);
   const newOrderId = gid(o.customer, newDelivDate);

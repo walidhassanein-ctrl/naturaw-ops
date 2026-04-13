@@ -618,7 +618,7 @@ async function genNextOrder(btn, orderId) {
     if (!baseDate) { btn.textContent = 'No date'; return; }
 
     const newDelivDate = calcNextDate(baseDate, o.standingFrequency || 'Bi-weekly');
-    const newOrderId = gid(o.customer, newDelivDate);
+    const newOrderId = `NR-${newDelivDate.replace(/-/g,'')}-${String(Math.floor(Math.random()*900)+100)}`;
     const today = new Date().toISOString().slice(0, 10);
 
     const props = {

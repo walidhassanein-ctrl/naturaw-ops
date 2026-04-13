@@ -592,15 +592,21 @@ function renderStanding() {
       <td>${nextFormatted}</td>
       <td style="font-size:12px">${fp(op(o))}</td>
       <td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td>
-      <td><button class="btn" style="font-size:12px;padding:5px 10px;white-space:nowrap" onclick="genNextOrder(this, this.dataset.oid)" data-oid="${o.id}">Generate next</button></td>
+      <td><button class="btn gen-next-btn" style="font-size:12px;padding:5px 10px;white-space:nowrap" data-oid="${o.id}">Generate next</button></td>
     </tr>`;
   });
   h+='</tbody></table></div></div>';
   el.innerHTML=h;
+
+  // Event delegation — one listener on the container catches all button clicks
+  el.querySelectorAll('.gen-next-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      genNextOrder(this, this.dataset.oid);
+    });
+  });
 }
 
 async function genNextOrder(btn, orderId) {
-  if (!orderId) orderId = btn.dataset.oid;
   const o = orders.find(x=>x.id===orderId);
   if (!o) return;
   if (!o.standingFrequency) { alert('No frequency set on this order. Update it in Notion first.'); return; }

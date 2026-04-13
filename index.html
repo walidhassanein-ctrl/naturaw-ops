@@ -607,74 +607,61 @@ function renderStanding() {
 }
 
 async function genNextOrder(btn, orderId) {
-  const o = orders.find(x=>x.id===orderId);
+  const o = orders.find(x => x.id === orderId);
   if (!o) return;
-  if (!o.standingFrequency) { alert('No frequency set on this order.'); return; }
 
-  const baseDate = o.nextRecurrenceDate || o.deliveryDate;
-  if (!baseDate) { alert('No delivery date found on this order.'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
 
-  const newDelivDate = calcNextDate(baseDate, o.standingFrequency);
-  const newOrderId = gid(o.customer, newDelivDate);
-  const today = new Date().toISOString().slice(0,10);
-  const prodSummary = fp(op(o)) || 'same products';
+  try {
+    const baseDate = o.nextRecurrenceDate || o.deliveryDate;
+    if (!baseDate) { btn.textContent = 'No date'; return; }
 
-  // Replace button row with inline confirmation — no confirm() dialog needed
-  const td = btn.closest('td');
-  td.innerHTML = `
-    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">
-      Delivery: <strong>${fd(newDelivDate)}</strong>
-    </div>
-    <div style="display:flex;gap:6px">
-      <button class="btn btnp" style="font-size:12px;padding:5px 10px" id="confirm-gen-${orderId}">Confirm</button>
-      <button class="btn" style="font-size:12px;padding:5px 10px" onclick="renderStanding()">Cancel</button>
-    </div>
-  `;
+    const newDelivDate = calcNextDate(baseDate, o.standingFrequency || 'Bi-weekly');
+    const newOrderId = gid(o.customer, newDelivDate);
+    const today = new Date().toISOString().slice(0, 10);
 
-  document.getElementById('confirm-gen-' + orderId).addEventListener('click', async function() {
-    this.disabled = true; this.textContent = 'Creating...';
-    try {
-      const props = {
-        'Order ID': { title: [{ text: { content: newOrderId } }] },
-        'Order Date': { date: { start: today } },
-        'Delivery Date': { date: { start: newDelivDate } },
-        'Status': { select: { name: 'New' } },
-        'Standing Order': { checkbox: true },
-        'Paid?': { checkbox: false },
-        'Beef Dinner 300': { number: o.b300||0 },
-        'Beef Dinner 500': { number: o.b500||0 },
-        'Chicken Dinner 300': { number: o.c300||0 },
-        'Chicken Dinner 500': { number: o.c500||0 },
-        'Rabbit Dinner 300': { number: o.r300||0 },
-        'Rabbit Dinner 500': { number: o.r500||0 },
-        'Duck Dinner 300': { number: o.d300||0 },
-        'Duck Dinner 500': { number: o.d500||0 },
-        'Bone': { number: o.bone||0 },
-        'Daily Boost': { number: o.boost||0 }
-      };
-      if (o.totalPrice) props['Total Price'] = { number: o.totalPrice };
-      if (o.paymentMethod) props['Payment Method'] = { select: { name: o.paymentMethod } };
-      if (o.standingFrequency) props['Standing Frequency'] = { select: { name: o.standingFrequency } };
-      if (o.deliveryCharge && o.deliveryCharge !== 'None') props['Delivery Charge (EGP)'] = { select: { name: o.deliveryCharge } };
-      if (o.notes) props['Notes'] = { rich_text: [{ text: { content: o.notes } }] };
-      const cust = customers.find(c=>c.name===o.customer);
-      if (cust) props['Customer'] = { relation: [{ id: cust.id }] };
+    const props = {
+      'Order ID': { title: [{ text: { content: newOrderId } }] },
+      'Order Date': { date: { start: today } },
+      'Delivery Date': { date: { start: newDelivDate } },
+      'Status': { select: { name: 'New' } },
+      'Standing Order': { checkbox: true },
+      'Paid?': { checkbox: false },
+      'Beef Dinner 300': { number: o.b300 || 0 },
+      'Beef Dinner 500': { number: o.b500 || 0 },
+      'Chicken Dinner 300': { number: o.c300 || 0 },
+      'Chicken Dinner 500': { number: o.c500 || 0 },
+      'Rabbit Dinner 300': { number: o.r300 || 0 },
+      'Rabbit Dinner 500': { number: o.r500 || 0 },
+      'Duck Dinner 300': { number: o.d300 || 0 },
+      'Duck Dinner 500': { number: o.d500 || 0 },
+      'Bone': { number: o.bone || 0 },
+      'Daily Boost': { number: o.boost || 0 }
+    };
+    if (o.totalPrice) props['Total Price'] = { number: o.totalPrice };
+    if (o.paymentMethod) props['Payment Method'] = { select: { name: o.paymentMethod } };
+    if (o.standingFrequency) props['Standing Frequency'] = { select: { name: o.standingFrequency } };
+    if (o.deliveryCharge && o.deliveryCharge !== 'None') props['Delivery Charge (EGP)'] = { select: { name: o.deliveryCharge } };
+    if (o.notes) props['Notes'] = { rich_text: [{ text: { content: o.notes } }] };
+    const cust = customers.find(c => c.name === o.customer);
+    if (cust) props['Customer'] = { relation: [{ id: cust.id }] };
 
-      await nPost('/pages', { parent: { database_id: DB_ORDERS }, properties: props });
+    await nPost('/pages', { parent: { database_id: DB_ORDERS }, properties: props });
 
-      const nextAfterNew = calcNextDate(newDelivDate, o.standingFrequency);
-      await nPatch('/pages/' + o.id, {
-        properties: { 'Next Recurrence Date': { date: { start: nextAfterNew } } }
-      });
+    const nextAfterNew = calcNextDate(newDelivDate, o.standingFrequency || 'Bi-weekly');
+    await nPatch('/pages/' + o.id, {
+      properties: { 'Next Recurrence Date': { date: { start: nextAfterNew } } }
+    });
 
-      this.textContent = 'Done!';
-      setTimeout(() => loadAll(), 800);
-    } catch(e) {
-      this.textContent = 'Failed';
-      this.disabled = false;
-      console.error(e);
-    }
-  });
+    btn.textContent = 'Done!';
+    setTimeout(() => loadAll(), 1000);
+
+  } catch(e) {
+    console.error('genNextOrder error:', e);
+    btn.textContent = 'Error';
+    btn.disabled = false;
+  }
 }
 
 // ─── SALES ─────────────────────────────────────────────────────────────────

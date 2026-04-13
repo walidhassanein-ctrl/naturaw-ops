@@ -659,7 +659,7 @@ async function genNextOrder(btn, orderId) {
 
   } catch(e) {
     console.error('genNextOrder error:', e);
-    btn.textContent = 'Error';
+    btn.textContent = 'Error: ' + e.message.slice(0, 30);
     btn.disabled = false;
   }
 }

@@ -263,6 +263,16 @@ async function nPost(path, body) {
   return r.json();
 }
 
+async function nPatch(path, body) {
+  const r = await fetch(`${PROXY}?path=${encodeURIComponent(path)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) { const e = await r.json(); throw new Error(e.message || r.status); }
+  return r.json();
+}
+
 async function queryDB(dbId, filter) {
   let results = [], cursor;
   do {
@@ -560,16 +570,97 @@ async function submitOrder() {
 }
 
 // ─── STANDING ──────────────────────────────────────────────────────────────
+function calcNextDate(fromDate, frequency) {
+  const d = new Date(fromDate);
+  if (frequency === 'Weekly') d.setDate(d.getDate() + 7);
+  else if (frequency === 'Bi-weekly') d.setDate(d.getDate() + 14);
+  else if (frequency === 'Monthly') d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0,10);
+}
+
 function renderStanding() {
   const st = orders.filter(o=>o.standingOrder&&!o.archived);
   const el = document.getElementById('stcontent');
   if(!st.length){el.innerHTML='<p class="hint">No standing orders.</p>';return;}
-  let h='<div class="card"><div style="overflow-x:auto"><table><thead><tr><th>Order ID</th><th>Customer</th><th>Frequency</th><th>Next delivery</th><th>Items</th><th>Total</th></tr></thead><tbody>';
+  let h='<div class="card"><div style="overflow-x:auto"><table><thead><tr><th>Order ID</th><th>Customer</th><th>Frequency</th><th>Next delivery</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
   [...st].sort((a,b)=>(a.nextRecurrenceDate||'9999').localeCompare(b.nextRecurrenceDate||'9999')).forEach(o=>{
-    h+=`<tr><td style="font-family:var(--mono);font-size:11px">${o.orderId||'—'}</td><td>${o.customer||'—'}</td><td><span class="badge bstand">${o.standingFrequency||'—'}</span></td><td>${o.nextRecurrenceDate?fd(o.nextRecurrenceDate):'—'}</td><td style="font-size:12px">${fp(op(o))}</td><td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td></tr>`;
+    const nextFormatted = o.nextRecurrenceDate ? fd(o.nextRecurrenceDate) : '<span style="color:#A32D2D;font-size:11px">Not set</span>';
+    h+=`<tr>
+      <td style="font-family:var(--font-mono);font-size:11px">${o.orderId||'—'}</td>
+      <td>${o.customer||'—'}</td>
+      <td><span class="badge bstand">${o.standingFrequency||'—'}</span></td>
+      <td>${nextFormatted}</td>
+      <td style="font-size:12px">${fp(op(o))}</td>
+      <td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td>
+      <td><button class="btn" style="font-size:12px;padding:5px 10px;white-space:nowrap" onclick="genNextOrder('${o.id}',this)">Generate next</button></td>
+    </tr>`;
   });
   h+='</tbody></table></div></div>';
   el.innerHTML=h;
+}
+
+async function genNextOrder(orderId, btn) {
+  const o = orders.find(x=>x.id===orderId);
+  if (!o) return;
+  if (!o.standingFrequency) { alert('No frequency set on this order. Update it in Notion first.'); return; }
+
+  const baseDate = o.nextRecurrenceDate || o.deliveryDate;
+  if (!baseDate) { alert('No delivery date to calculate from. Set a Next Recurrence Date in Notion first.'); return; }
+
+  const newDelivDate = calcNextDate(baseDate, o.standingFrequency);
+  const newOrderId = gid(o.customer, newDelivDate);
+  const today = new Date().toISOString().slice(0,10);
+  const prodSummary = fp(op(o)) || 'same products';
+
+  if (!confirm(`Generate next order for ${o.customer||'this customer'}?\n\nDelivery: ${fd(newDelivDate)}\nProducts: ${prodSummary}\nTotal: EGP ${(o.totalPrice||0).toLocaleString()}`)) return;
+
+  btn.disabled = true; btn.textContent = 'Creating...';
+
+  try {
+    // Build new order properties
+    const props = {
+      'Order ID': { title: [{ text: { content: newOrderId } }] },
+      'Order Date': { date: { start: today } },
+      'Delivery Date': { date: { start: newDelivDate } },
+      'Status': { select: { name: 'New' } },
+      'Standing Order': { checkbox: true },
+      'Paid?': { checkbox: false },
+      'Beef Dinner 300': { number: o.b300||0 },
+      'Beef Dinner 500': { number: o.b500||0 },
+      'Chicken Dinner 300': { number: o.c300||0 },
+      'Chicken Dinner 500': { number: o.c500||0 },
+      'Rabbit Dinner 300': { number: o.r300||0 },
+      'Rabbit Dinner 500': { number: o.r500||0 },
+      'Duck Dinner 300': { number: o.d300||0 },
+      'Duck Dinner 500': { number: o.d500||0 },
+      'Bone': { number: o.bone||0 },
+      'Daily Boost': { number: o.boost||0 }
+    };
+    if (o.totalPrice) props['Total Price'] = { number: o.totalPrice };
+    if (o.paymentMethod) props['Payment Method'] = { select: { name: o.paymentMethod } };
+    if (o.standingFrequency) props['Standing Frequency'] = { select: { name: o.standingFrequency } };
+    if (o.deliveryCharge && o.deliveryCharge !== 'None') props['Delivery Charge (EGP)'] = { select: { name: o.deliveryCharge } };
+    if (o.notes) props['Notes'] = { rich_text: [{ text: { content: o.notes } }] };
+    const cust = customers.find(c=>c.name===o.customer);
+    if (cust) props['Customer'] = { relation: [{ id: cust.id }] };
+
+    // Create new order
+    await nPost('/pages', { parent: { database_id: DB_ORDERS }, properties: props });
+
+    // Update Next Recurrence Date on original standing order to the one after new delivery
+    const nextAfterNew = calcNextDate(newDelivDate, o.standingFrequency);
+    await nPatch('/pages/' + o.id, {
+      properties: { 'Next Recurrence Date': { date: { start: nextAfterNew } } }
+    });
+
+    btn.textContent = 'Done!';
+    setTimeout(async () => { await loadAll(); }, 800);
+
+  } catch(e) {
+    alert('Failed: ' + e.message);
+    console.error(e);
+    btn.disabled = false; btn.textContent = 'Generate next';
+  }
 }
 
 // ─── SALES ─────────────────────────────────────────────────────────────────

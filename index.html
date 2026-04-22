@@ -104,6 +104,20 @@ input:focus, select:focus { border-color: var(--border3); }
 .er { color: var(--red) !important; }
 .ld { animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+/* ── Orders tab ── */
+.orders-filters { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+.orders-filters input[type=text] { flex: 1; min-width: 160px; }
+.orders-filters select { min-width: 130px; }
+
+/* Edit modal overlay */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg1); border: 0.5px solid var(--border2); border-radius: var(--rl); padding: 1.5rem; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; position: relative; }
+.modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 1.25rem; }
+.modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text2); padding: 4px 8px; border-radius: var(--r); }
+.modal-close:hover { background: var(--bg2); }
+.modal-footer { display: flex; gap: 10px; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -119,7 +133,7 @@ input:focus, select:focus { border-color: var(--border3); }
     <button class="active" onclick="showTab('delivery',this)">Delivery list</button>
     <button onclick="showTab('invoice',this)">Invoice</button>
     <button onclick="showTab('neworder',this)">New order</button>
-    <button onclick="showTab('standing',this)">Standing orders</button>
+    <button onclick="showTab('orders',this)">Orders</button>
     <button onclick="showTab('sales',this)">Sales</button>
     <button onclick="showTab('inventory',this)">Inventory</button>
     <button onclick="showTab('pricing',this)">Pricing</button>
@@ -172,14 +186,6 @@ input:focus, select:focus { border-color: var(--border3); }
           <div id="npg" class="pg"></div>
         </div>
         <div><label>Total (EGP)</label><input type="number" id="ntotal" placeholder="Auto or override" /></div>
-        <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
-          <input type="checkbox" id="nstand" onchange="toggleSt()" />
-          <label for="nstand" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);margin-bottom:0;cursor:pointer;">Standing order</label>
-        </div>
-        <div id="nfreqw" style="display:none">
-          <label>Frequency</label>
-          <select id="nfreq"><option>Weekly</option><option>Bi-weekly</option><option>Monthly</option></select>
-        </div>
         <div class="full"><label>Notes</label><input type="text" id="nnotes" placeholder="Special instructions..." /></div>
       </div>
       <div style="margin-top:1rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -189,8 +195,23 @@ input:focus, select:focus { border-color: var(--border3); }
     </div>
   </div>
 
-  <!-- STANDING -->
-  <div id="tab-standing" class="tab"><div id="stcontent"><p class="hint">Loading...</p></div></div>
+  <!-- ORDERS -->
+  <div id="tab-orders" class="tab">
+    <div class="orders-filters">
+      <input type="text" id="oSearch" placeholder="Search customer or order ID…" oninput="renderOrders()" />
+      <select id="oStatus" onchange="renderOrders()">
+        <option value="">All statuses</option>
+        <option value="New">New</option>
+        <option value="Delivered">Delivered</option>
+      </select>
+      <select id="oPaid" onchange="renderOrders()">
+        <option value="">Paid &amp; unpaid</option>
+        <option value="paid">Paid</option>
+        <option value="unpaid">Unpaid</option>
+      </select>
+    </div>
+    <div id="ocontent"><p class="hint">Loading…</p></div>
+  </div>
 
   <!-- SALES -->
   <div id="tab-sales" class="tab">
@@ -219,9 +240,50 @@ input:focus, select:focus { border-color: var(--border3); }
   </div>
 </div>
 
+<!-- EDIT ORDER MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+    <h2 id="editModalTitle">Edit Order</h2>
+    <div class="fg">
+      <div><label>Status</label>
+        <select id="eStatus" style="width:100%">
+          <option value="New">New</option>
+          <option value="Delivered">Delivered</option>
+        </select>
+      </div>
+      <div><label>Delivery date</label><input type="date" id="eDelivDate" style="width:100%" /></div>
+      <div><label>Payment method</label>
+        <select id="ePayMethod" style="width:100%">
+          <option>Cash</option><option>Instapay</option><option>Vodafone Cash</option><option>Transfer</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+        <input type="checkbox" id="ePaid" />
+        <label for="ePaid" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);margin-bottom:0;cursor:pointer;">Paid</label>
+      </div>
+      <div><label>Delivery charge</label>
+        <select id="eDelivCharge" style="width:100%">
+          <option value="None">None</option><option value="50">EGP 50</option><option value="100">EGP 100</option>
+        </select>
+      </div>
+      <div><label>Total (EGP)</label><input type="number" id="eTotal" style="width:100%" /></div>
+      <div class="full">
+        <div class="sep">Products</div>
+        <div id="epg" class="pg"></div>
+      </div>
+      <div class="full"><label>Notes</label><input type="text" id="eNotes" style="width:100%" placeholder="Special instructions..." /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btnp" onclick="saveEditOrder()">Save to Notion</button>
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <span id="editMsg" class="sm"></span>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-// Your Notion database IDs
 const DB_ORDERS    = '308bd212-68bb-802b-a88c-c5ed3bb0bffa';
 const DB_CUSTOMERS = 'ae8d6fc0-333a-4a93-b09d-564d267377f5';
 const DB_PRODUCTS  = '33332c20-c289-49dc-83ae-8406b07b1e6b';
@@ -229,7 +291,6 @@ const DB_STOCK     = '5ca011a9-c00c-4b9c-9fe5-a86b44a70497';
 const DB_DOGS      = '308bd212-68bb-80e2-8609-ee0e3e10827e';
 const DB_MATERIALS = 'c0c76d91-d151-4ad0-8234-4b3bd65e6a5d';
 
-// Proxy endpoint (routes through Netlify function)
 const PROXY = 'https://lucky-silence-1f1e.walid-hassanein.workers.dev';
 
 // ─── PRODUCT KEYS ──────────────────────────────────────────────────────────
@@ -245,6 +306,7 @@ const PNAME = {
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let orders = [], customers = [], products = [], stock = [], materials = [], dogs = [];
+let editingOrderId = null;
 
 // ─── API ───────────────────────────────────────────────────────────────────
 async function nGet(path) {
@@ -334,6 +396,7 @@ async function loadAll() {
         id: o.id,
         orderId: pTxt(o,'Order ID') || '',
         customer: cust?.name || null,
+        customerId: custIds[0] || null,
         phone: cust?.phone || null,
         address: cust?.address || null,
         area: cust?.area || null,
@@ -387,11 +450,8 @@ async function loadAll() {
       customerIds: pRel(d,'Customer')
     }));
 
-    // Build dog lookup by id
     const dogMap = {};
     dogs.forEach(d => dogMap[d.id] = d);
-
-    // Link dog names into orders
     orders.forEach(o => {
       o.dogNames = (o.dogIds || []).map(id => dogMap[id]?.name).filter(Boolean);
     });
@@ -419,7 +479,7 @@ function populateUI() {
   [...orders].filter(o=>!o.archived).sort((a,b)=>(b.deliveryDate||'').localeCompare(a.deliveryDate||'')).forEach(o => {
     is.innerHTML += `<option value="${o.id}">${o.orderId||o.id.slice(0,8)} — ${o.customer||'?'} (${o.deliveryDate||'—'})</option>`;
   });
-  buildPG(); renderPricing(); renderStanding(); renderSales(); renderInventory();
+  buildPG(); renderPricing(); renderSales(); renderInventory(); renderOrders();
 }
 
 function buildPG() {
@@ -432,13 +492,29 @@ function buildPG() {
   }).join('');
 }
 
+function buildEditPG(o) {
+  document.getElementById('epg').innerHTML = PKEYS.map(k => {
+    const p = px(k), tbd = p===0;
+    const lbl = k.replace(' Dinner','').replace(/ (300|500)$/,'');
+    const sz = k.match(/300/)? '300g' : k.match(/500/)? '500g' : '';
+    const sub = tbd ? '<span style="color:#A32D2D">TBD</span>' : 'EGP '+p;
+    const val = op(o)[k] || 0;
+    return `<div class="pi"><label>${lbl}<br><span style="font-size:10px;color:var(--text3)">${sz?sz+' · ':''}${sub}</span></label><input type="number" id="ep_${k.replace(/ /g,'_')}" min="0" value="${val}" onchange="calcEditT()" /></div>`;
+  }).join('');
+}
+
 function calcT() {
   let t = 0;
   PKEYS.forEach(k => { const el = document.getElementById('p_'+k.replace(/ /g,'_')); if(el) t += (parseInt(el.value)||0)*px(k); });
   if(t>0) document.getElementById('ntotal').value = t;
 }
 
-function toggleSt() { document.getElementById('nfreqw').style.display = document.getElementById('nstand').checked ? 'block' : 'none'; }
+function calcEditT() {
+  let t = 0;
+  PKEYS.forEach(k => { const el = document.getElementById('ep_'+k.replace(/ /g,'_')); if(el) t += (parseInt(el.value)||0)*px(k); });
+  if(t>0) document.getElementById('eTotal').value = t;
+}
+
 function setSL(t, loading) { const el=document.getElementById('sl'); el.textContent=t; el.className='sl'+(loading?' ld':''); }
 function showTab(n,btn) { document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active')); document.getElementById('tab-'+n).classList.add('active'); if(btn)btn.classList.add('active'); }
 
@@ -450,7 +526,7 @@ function loadDelivery() {
   if(!day.length){document.getElementById('dcontent').innerHTML=`<p class="hint">No deliveries for ${fd(date)}.</p>`;return;}
   let h = `<div class="card"><div class="ct">${day.length} order${day.length>1?'s':''} — ${fd(date)}</div><div style="overflow-x:auto"><table><thead><tr><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Notes</th><th>Status</th></tr></thead><tbody>`;
   day.forEach(o => {
-    h += `<tr><td><strong>${o.customer||'—'}</strong>${o.standingOrder?' <span class="badge bstand">standing</span>':''}<br><span style="font-size:11px;color:var(--text3)">${o.phone||''}</span></td><td style="font-size:12px">${fp(op(o))}</td><td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td><td style="font-size:12px">${o.paymentMethod||'—'}<br><span style="font-size:11px;color:${o.paid?'var(--green)':'var(--red)'}">${o.paid?'Paid':'Collect'}</span></td><td style="font-size:12px;color:var(--text2)">${o.notes||''}</td><td>${bfor(o.status)}</td></tr>`;
+    h += `<tr><td><strong>${o.customer||'—'}</strong><br><span style="font-size:11px;color:var(--text3)">${o.phone||''}</span></td><td style="font-size:12px">${fp(op(o))}</td><td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td><td style="font-size:12px">${o.paymentMethod||'—'}<br><span style="font-size:11px;color:${o.paid?'var(--green)':'var(--red)'}">${o.paid?'Paid':'Collect'}</span></td><td style="font-size:12px;color:var(--text2)">${o.notes||''}</td><td>${bfor(o.status)}</td></tr>`;
   });
   h += '</tbody></table></div></div>';
   document.getElementById('dcontent').innerHTML = h;
@@ -517,11 +593,8 @@ async function submitOrder() {
   const dd = document.getElementById('ndd').value;
   if(!cid||!dd){alert('Customer and delivery date required.');return;}
   const od = document.getElementById('nod').value||dd;
-  // Auto-link customer's dogs
   const custDogs = dogs.filter(d => d.customerIds.includes(cid));
   const pay = document.getElementById('npay').value;
-  const standing = document.getElementById('nstand').checked;
-  const freq = document.getElementById('nfreq').value;
   const total = parseFloat(document.getElementById('ntotal').value)||0;
   const notes = document.getElementById('nnotes').value||'';
   const oid = `NR-${dd.replace(/-/g,'')}-${String(Math.floor(Math.random()*900)+100)}`;
@@ -537,7 +610,7 @@ async function submitOrder() {
     'Payment Method': { select: {name:pay} },
     'Total Price': { number: total },
     'Paid?': { checkbox: false },
-    'Standing Order': { checkbox: standing },
+    'Standing Order': { checkbox: false },
     'Notes': { rich_text: [{text:{content:notes}}] },
     ...(custDogs.length ? {'Dogs': { relation: custDogs.map(d => ({id: d.id})) }} : {}),
     'Delivery Charge (EGP)': { select: {name: document.getElementById('ndelivcharge').value} },
@@ -552,7 +625,6 @@ async function submitOrder() {
     'Bone': { number: iv('p_Bone') },
     'Daily Boost': { number: iv('p_Daily_Boost') }
   };
-  if(standing) props['Standing Frequency'] = { select: {name:freq} };
 
   try {
     await nPost('/pages', { parent:{database_id:DB_ORDERS}, properties:props });
@@ -560,8 +632,6 @@ async function submitOrder() {
     PKEYS.forEach(k=>{const el=document.getElementById('p_'+k.replace(/ /g,'_'));if(el)el.value=0;});
     document.getElementById('ntotal').value='';
     document.getElementById('nnotes').value='';
-    document.getElementById('nstand').checked=false;
-    document.getElementById('nfreqw').style.display='none';
     await loadAll();
   } catch(e) {
     msg.className='sm er'; msg.textContent='Failed: '+e.message;
@@ -569,100 +639,115 @@ async function submitOrder() {
   }
 }
 
-// ─── STANDING ──────────────────────────────────────────────────────────────
-function calcNextDate(fromDate, frequency) {
-  const d = new Date(fromDate);
-  if (frequency === 'Weekly') d.setDate(d.getDate() + 7);
-  else if (frequency === 'Bi-weekly') d.setDate(d.getDate() + 14);
-  else if (frequency === 'Monthly') d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0,10);
-}
+// ─── ORDERS TAB ────────────────────────────────────────────────────────────
+function renderOrders() {
+  const search = (document.getElementById('oSearch')?.value || '').toLowerCase();
+  const statusF = document.getElementById('oStatus')?.value || '';
+  const paidF = document.getElementById('oPaid')?.value || '';
 
-function renderStanding() {
-  const st = orders.filter(o=>o.standingOrder&&!o.archived);
-  const el = document.getElementById('stcontent');
-  if(!st.length){el.innerHTML='<p class="hint">No standing orders.</p>';return;}
-  let h='<div class="card"><div style="overflow-x:auto"><table><thead><tr><th>Order ID</th><th>Customer</th><th>Frequency</th><th>Next delivery</th><th>Items</th><th>Total</th><th></th></tr></thead><tbody>';
-  [...st].sort((a,b)=>(a.nextRecurrenceDate||'9999').localeCompare(b.nextRecurrenceDate||'9999')).forEach(o=>{
-    const nextFormatted = o.nextRecurrenceDate ? fd(o.nextRecurrenceDate) : '<span style="color:#A32D2D;font-size:11px">Not set</span>';
-    h+=`<tr>
-      <td style="font-family:var(--font-mono);font-size:11px">${o.orderId||'—'}</td>
-      <td>${o.customer||'—'}</td>
-      <td><span class="badge bstand">${o.standingFrequency||'—'}</span></td>
-      <td>${nextFormatted}</td>
-      <td style="font-size:12px">${fp(op(o))}</td>
-      <td style="white-space:nowrap">${o.totalPrice?'EGP '+o.totalPrice.toLocaleString():'—'}</td>
-      <td><button class="btn gen-next-btn" style="font-size:12px;padding:5px 10px;white-space:nowrap" data-oid="${o.id}">Generate next</button></td>
+  let filtered = orders.filter(o => !o.archived);
+  if (search) filtered = filtered.filter(o =>
+    (o.customer||'').toLowerCase().includes(search) ||
+    (o.orderId||'').toLowerCase().includes(search)
+  );
+  if (statusF) filtered = filtered.filter(o => o.status === statusF);
+  if (paidF === 'paid') filtered = filtered.filter(o => o.paid);
+  if (paidF === 'unpaid') filtered = filtered.filter(o => !o.paid);
+
+  filtered.sort((a,b) => (b.deliveryDate||'').localeCompare(a.deliveryDate||''));
+
+  const el = document.getElementById('ocontent');
+  if (!filtered.length) { el.innerHTML = '<p class="hint">No orders match.</p>'; return; }
+
+  let h = `<div class="card" style="padding:0"><div style="overflow-x:auto"><table>
+    <thead><tr>
+      <th>Order ID</th><th>Customer</th><th>Delivery</th><th>Items</th>
+      <th>Total</th><th>Status</th><th>Paid</th><th></th>
+    </tr></thead><tbody>`;
+
+  filtered.forEach(o => {
+    const items = fp(op(o)) || '—';
+    const total = o.totalPrice ? 'EGP ' + o.totalPrice.toLocaleString() : '—';
+    h += `<tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text2);white-space:nowrap">${o.orderId||'—'}</td>
+      <td><strong style="font-size:13px">${o.customer||'—'}</strong></td>
+      <td style="white-space:nowrap;font-size:12px">${o.deliveryDate?fd(o.deliveryDate):'—'}</td>
+      <td style="font-size:12px;color:var(--text2);max-width:200px">${items}</td>
+      <td style="white-space:nowrap;font-size:13px">${total}</td>
+      <td>${bfor(o.status)}</td>
+      <td><span style="font-size:11px;color:${o.paid?'var(--green)':'var(--red)'}">${o.paid?'✓ Paid':'Unpaid'}</span></td>
+      <td><button class="btn btns" onclick="openEditModal('${o.id}')">Edit</button></td>
     </tr>`;
   });
-  h+='</tbody></table></div></div>';
-  el.innerHTML=h;
 
-  // Event delegation — one listener on the container catches all button clicks
-  el.querySelectorAll('.gen-next-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      genNextOrder(this, this.dataset.oid);
-    });
-  });
+  h += '</tbody></table></div></div>';
+  el.innerHTML = h;
 }
 
-async function genNextOrder(btn, orderId) {
+function openEditModal(orderId) {
   const o = orders.find(x => x.id === orderId);
   if (!o) return;
+  editingOrderId = orderId;
 
-  btn.disabled = true;
-  btn.textContent = 'Creating...';
+  document.getElementById('editModalTitle').textContent = `Edit — ${o.orderId || orderId.slice(0,8)}`;
+  document.getElementById('eStatus').value = o.status || 'New';
+  document.getElementById('eDelivDate').value = o.deliveryDate || '';
+  document.getElementById('ePayMethod').value = o.paymentMethod || 'Instapay';
+  document.getElementById('ePaid').checked = o.paid || false;
+  document.getElementById('eDelivCharge').value = o.deliveryCharge || 'None';
+  document.getElementById('eTotal').value = o.totalPrice || '';
+  document.getElementById('eNotes').value = o.notes || '';
+  document.getElementById('editMsg').textContent = '';
+  document.getElementById('editMsg').className = 'sm';
+  buildEditPG(o);
+
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+  editingOrderId = null;
+}
+
+async function saveEditOrder() {
+  if (!editingOrderId) return;
+  const msg = document.getElementById('editMsg');
+  msg.className = 'sm ld'; msg.textContent = 'Saving...';
+
+  const props = {
+    'Status': { select: { name: document.getElementById('eStatus').value } },
+    'Delivery Date': { date: { start: document.getElementById('eDelivDate').value } },
+    'Payment Method': { select: { name: document.getElementById('ePayMethod').value } },
+    'Paid?': { checkbox: document.getElementById('ePaid').checked },
+    'Delivery Charge (EGP)': { select: { name: document.getElementById('eDelivCharge').value } },
+    'Total Price': { number: parseFloat(document.getElementById('eTotal').value) || 0 },
+    'Notes': { rich_text: [{ text: { content: document.getElementById('eNotes').value || '' } }] },
+    'Beef Dinner 300': { number: iv('ep_Beef_Dinner_300') },
+    'Beef Dinner 500': { number: iv('ep_Beef_Dinner_500') },
+    'Chicken Dinner 300': { number: iv('ep_Chicken_Dinner_300') },
+    'Chicken Dinner 500': { number: iv('ep_Chicken_Dinner_500') },
+    'Rabbit Dinner 300': { number: iv('ep_Rabbit_Dinner_300') },
+    'Rabbit Dinner 500': { number: iv('ep_Rabbit_Dinner_500') },
+    'Duck Dinner 300': { number: iv('ep_Duck_Dinner_300') },
+    'Duck Dinner 500': { number: iv('ep_Duck_Dinner_500') },
+    'Bone': { number: iv('ep_Bone') },
+    'Daily Boost': { number: iv('ep_Daily_Boost') }
+  };
 
   try {
-    const baseDate = o.nextRecurrenceDate || o.deliveryDate;
-    if (!baseDate) { btn.textContent = 'No date'; return; }
-
-    const newDelivDate = calcNextDate(baseDate, o.standingFrequency || 'Bi-weekly');
-    const newOrderId = `NR-${newDelivDate.replace(/-/g,'')}-${String(Math.floor(Math.random()*900)+100)}`;
-    const today = new Date().toISOString().slice(0, 10);
-
-    const props = {
-      'Order ID': { title: [{ text: { content: newOrderId } }] },
-      'Order Date': { date: { start: today } },
-      'Delivery Date': { date: { start: newDelivDate } },
-      'Status': { select: { name: 'New' } },
-      'Standing Order': { checkbox: true },
-      'Paid?': { checkbox: false },
-      'Beef Dinner 300': { number: o.b300 || 0 },
-      'Beef Dinner 500': { number: o.b500 || 0 },
-      'Chicken Dinner 300': { number: o.c300 || 0 },
-      'Chicken Dinner 500': { number: o.c500 || 0 },
-      'Rabbit Dinner 300': { number: o.r300 || 0 },
-      'Rabbit Dinner 500': { number: o.r500 || 0 },
-      'Duck Dinner 300': { number: o.d300 || 0 },
-      'Duck Dinner 500': { number: o.d500 || 0 },
-      'Bone': { number: o.bone || 0 },
-      'Daily Boost': { number: o.boost || 0 }
-    };
-    if (o.totalPrice) props['Total Price'] = { number: o.totalPrice };
-    if (o.paymentMethod) props['Payment Method'] = { select: { name: o.paymentMethod } };
-    if (o.standingFrequency) props['Standing Frequency'] = { select: { name: o.standingFrequency } };
-    if (o.deliveryCharge && o.deliveryCharge !== 'None') props['Delivery Charge (EGP)'] = { select: { name: o.deliveryCharge } };
-    if (o.notes) props['Notes'] = { rich_text: [{ text: { content: o.notes } }] };
-    const cust = customers.find(c => c.name === o.customer);
-    if (cust) props['Customer'] = { relation: [{ id: cust.id }] };
-
-    await nPost('/pages', { parent: { database_id: DB_ORDERS }, properties: props });
-
-    const nextAfterNew = calcNextDate(newDelivDate, o.standingFrequency || 'Bi-weekly');
-    await nPatch('/pages/' + o.id, {
-      properties: { 'Next Recurrence Date': { date: { start: nextAfterNew } } }
-    });
-
-    btn.textContent = 'Done!';
-    setTimeout(() => loadAll(), 1000);
-
+    await nPatch('/pages/' + editingOrderId, { properties: props });
+    msg.className = 'sm ok'; msg.textContent = 'Saved!';
+    setTimeout(() => { closeEditModal(); loadAll(); }, 800);
   } catch(e) {
-    console.error('genNextOrder error:', e);
-    btn.textContent = 'Error: ' + e.message.slice(0, 30);
-    btn.disabled = false;
+    msg.className = 'sm er'; msg.textContent = 'Failed: ' + e.message;
+    console.error(e);
   }
 }
+
+// Close modal on overlay click
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
 
 // ─── SALES ─────────────────────────────────────────────────────────────────
 function renderSales() {
@@ -700,21 +785,13 @@ function renderPricing() {
 // ─── INVENTORY ─────────────────────────────────────────────────────────────
 function renderInventory() {
   const el = document.getElementById('inv-content');
-
-  // Unfulfilled orders = New or Preparing
-  const unfulfilled = orders.filter(o => !o.archived && (o.status === 'New' || o.status === 'Preparing'));
-
-  // Sum up what's needed by product key
+  const unfulfilled = orders.filter(o => !o.archived && o.status === 'New');
   const needed = {};
   const DKEYS = ['Beef Dinner 300','Beef Dinner 500','Chicken Dinner 300','Chicken Dinner 500',
                  'Rabbit Dinner 300','Rabbit Dinner 500','Duck Dinner 300','Duck Dinner 500'];
   DKEYS.forEach(k => needed[k] = 0);
-  unfulfilled.forEach(o => {
-    const p = op(o);
-    DKEYS.forEach(k => { needed[k] += p[k] || 0; });
-  });
+  unfulfilled.forEach(o => { const p = op(o); DKEYS.forEach(k => { needed[k] += p[k] || 0; }); });
 
-  // Map stock to product keys
   const onHand = {};
   DKEYS.forEach(k => onHand[k] = 0);
   stock.forEach(s => {
@@ -722,50 +799,38 @@ function renderInventory() {
     if (onHand[key] !== undefined) onHand[key] += s.packs || 0;
   });
 
-  // Build shortfall table
   const rows = DKEYS.map(k => ({
     key: k,
     label: k.replace(' Dinner',' ').replace(' 300',' 300g').replace(' 500',' 500g'),
-    onHand: onHand[k],
-    needed: needed[k],
+    onHand: onHand[k], needed: needed[k],
     shortfall: Math.max(0, needed[k] - onHand[k]),
     surplus: Math.max(0, onHand[k] - needed[k])
   })).filter(r => r.onHand > 0 || r.needed > 0);
 
-  let h = '';
-
-  // Summary metrics
   const totalShortfall = rows.reduce((s,r) => s + r.shortfall, 0);
   const totalSurplus = rows.reduce((s,r) => s + r.surplus, 0);
-  const unfulfilledCount = unfulfilled.length;
 
-  h += `<div class="mg">
-    <div class="m"><div class="ml">Unfulfilled orders</div><div class="mv">${unfulfilledCount}</div></div>
+  let h = `<div class="mg">
+    <div class="m"><div class="ml">Unfulfilled orders</div><div class="mv">${unfulfilled.length}</div></div>
     <div class="m"><div class="ml">Packs short</div><div class="mv" style="color:${totalShortfall>0?'var(--red)':'var(--green)'}">${totalShortfall}</div></div>
     <div class="m"><div class="ml">Surplus packs</div><div class="mv">${totalSurplus}</div></div>
   </div>`;
 
-  // Stock vs orders table
   if (rows.length) {
     h += `<div class="card"><div class="ct">Prepared stock vs unfulfilled orders</div>
     <table><thead><tr><th>Product</th><th>In freezer</th><th>Orders pending</th><th>Shortfall</th><th>Surplus</th></tr></thead><tbody>`;
     rows.forEach(r => {
       const shortColor = r.shortfall > 0 ? 'color:var(--red);font-weight:500' : 'color:var(--text3)';
       const surpColor = r.surplus > 0 ? 'color:var(--green);font-weight:500' : 'color:var(--text3)';
-      h += `<tr>
-        <td>${r.label}</td>
-        <td>${r.onHand}</td>
-        <td>${r.needed}</td>
+      h += `<tr><td>${r.label}</td><td>${r.onHand}</td><td>${r.needed}</td>
         <td style="${shortColor}">${r.shortfall > 0 ? '−' + r.shortfall : '—'}</td>
-        <td style="${surpColor}">${r.surplus > 0 ? '+' + r.surplus : '—'}</td>
-      </tr>`;
+        <td style="${surpColor}">${r.surplus > 0 ? '+' + r.surplus : '—'}</td></tr>`;
     });
     h += '</tbody></table></div>';
   } else {
-    h += `<div class="card"><div class="ct">Prepared stock vs unfulfilled orders</div><p class="hint" style="padding:1rem">No stock or pending orders yet. Update your Prepared Stock table in Notion.</p></div>`;
+    h += `<div class="card"><div class="ct">Prepared stock vs unfulfilled orders</div><p class="hint" style="padding:1rem">No stock or pending orders yet.</p></div>`;
   }
 
-  // What to make (batches needed)
   const toMake = rows.filter(r => r.shortfall > 0);
   if (toMake.length) {
     h += `<div class="card"><div class="ct">What to make</div>
@@ -779,7 +844,6 @@ function renderInventory() {
     h += '</tbody></table></div>';
   }
 
-  // Raw materials
   h += `<div class="card"><div class="ct">Raw materials on hand</div>`;
   if (materials.length) {
     h += `<table><thead><tr><th>Ingredient</th><th>Category</th><th>In stock (kg)</th><th>Last restocked</th></tr></thead><tbody>`;
@@ -787,8 +851,7 @@ function renderInventory() {
       const stockColor = m.inStock === 0 ? 'color:var(--red)' : m.inStock < 2 ? 'color:var(--amber)' : 'color:var(--green)';
       h += `<tr><td>${m.ingredient}</td><td style="font-size:12px;color:var(--text2)">${m.category}</td><td style="${stockColor};font-weight:500">${m.inStock > 0 ? m.inStock + ' kg' : '—'}</td><td style="font-size:12px;color:var(--text2)">${m.lastRestocked ? fd(m.lastRestocked) : '—'}</td></tr>`;
     });
-    h += '</tbody></table>';
-    h += `<p style="font-size:12px;color:var(--text3);margin-top:0.75rem;">Update stock levels directly in the Raw Materials Notion table.</p>`;
+    h += '</tbody></table><p style="font-size:12px;color:var(--text3);margin-top:0.75rem;">Update stock levels directly in the Raw Materials Notion table.</p>';
   } else {
     h += `<p class="hint" style="padding:1rem">No materials found.</p>`;
   }
@@ -801,7 +864,7 @@ function renderInventory() {
 function iv(id){return parseInt(document.getElementById(id)?.value)||0;}
 function fd(d){if(!d)return'—';const[y,m,day]=d.split('-');return `${parseInt(day)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]} ${y}`;}
 function fp(p){return Object.entries(p).filter(([,v])=>v>0).map(([k,v])=>`${v}x ${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}`).join(', ');}
-function bfor(s){const m={'New':'bn','Preparing':'bprep','Out for Delivery':'bout','Delivered':'bdone'};return `<span class="badge ${m[s]||'bn'}">${s||'New'}</span>`;}
+function bfor(s){const m={'New':'bn','Delivered':'bdone'};return `<span class="badge ${m[s]||'bn'}">${s||'New'}</span>`;}
 function cp(id,btn){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>{const o=btn.textContent;btn.textContent='Copied!';setTimeout(()=>btn.textContent=o,1500);});}
 
 // ─── INIT ──────────────────────────────────────────────────────────────────

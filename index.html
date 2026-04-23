@@ -536,7 +536,6 @@ function genCourier() {
   const date = document.getElementById('ddate').value;
   const day = orders.filter(o=>o.deliveryDate===date&&!o.archived);
   if(!day.length){alert('Load deliveries first.');return;}
-  const total = day.reduce((s,o)=>s+(o.totalPrice||0),0);
   let m = `*NatuRaw — ${fd(date)}*\n${day.length} stop${day.length>1?'s':''}\n─────────────────────`;
   day.forEach((o,i) => {
     const pr = Object.entries(op(o)).filter(([,v])=>v>0).map(([k,v])=>`${v}x ${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}`).join(', ');
@@ -756,12 +755,20 @@ function renderSales() {
   if(per==='month'){const m=now.toISOString().slice(0,7);f=f.filter(o=>(o.deliveryDate||'').startsWith(m));}
   else if(per==='last30'){const c=new Date(now-30*864e5).toISOString().slice(0,10);f=f.filter(o=>(o.deliveryDate||'')>=c);}
   else if(per==='year'){f=f.filter(o=>(o.deliveryDate||'').startsWith(now.getFullYear()+''));}
+  // kg sold: 300g packs = 0.3kg, 500g packs = 0.5kg, bone + daily boost = 1kg each
+  const totalKg = parseFloat(f.reduce((s,o) =>
+    s + (o.b300||0)*0.3 + (o.b500||0)*0.5
+      + (o.c300||0)*0.3 + (o.c500||0)*0.5
+      + (o.r300||0)*0.3 + (o.r500||0)*0.5
+      + (o.d300||0)*0.3 + (o.d500||0)*0.5
+      + (o.bone||0)*1   + (o.boost||0)*1
+  , 0).toFixed(1));
   const rev=f.reduce((s,o)=>s+(o.totalPrice||0),0), cnt=f.length, paid=f.filter(o=>o.paid).length, avg=cnt?Math.round(rev/cnt):0;
   const pt={};f.forEach(o=>PKEYS.forEach(k=>{const v=op(o)[k]||0;if(v>0)pt[k]=(pt[k]||0)+v;}));
   const tp=Object.entries(pt).sort((a,b)=>b[1]-a[1]).slice(0,6), mq=tp[0]?.[1]||1;
   const cr={};f.forEach(o=>{if(o.customer)cr[o.customer]=(cr[o.customer]||0)+(o.totalPrice||0);});
   const tc=Object.entries(cr).sort((a,b)=>b[1]-a[1]).slice(0,5), mc=tc[0]?.[1]||1;
-  let h=`<div class="mg"><div class="m"><div class="ml">Revenue</div><div class="mv" style="font-size:17px">EGP ${rev.toLocaleString()}</div></div><div class="m"><div class="ml">Orders</div><div class="mv">${cnt}</div></div><div class="m"><div class="ml">Avg order</div><div class="mv" style="font-size:17px">EGP ${avg.toLocaleString()}</div></div><div class="m"><div class="ml">Paid</div><div class="mv">${Math.round(paid/Math.max(cnt,1)*100)}%</div><div class="ms">${paid}/${cnt}</div></div></div>`;
+  let h=`<div class="mg"><div class="m"><div class="ml">Revenue</div><div class="mv" style="font-size:17px">EGP ${rev.toLocaleString()}</div></div><div class="m"><div class="ml">Food sold</div><div class="mv">${totalKg}</div><div class="ms">kg</div></div><div class="m"><div class="ml">Orders</div><div class="mv">${cnt}</div></div><div class="m"><div class="ml">Avg order</div><div class="mv" style="font-size:17px">EGP ${avg.toLocaleString()}</div></div><div class="m"><div class="ml">Paid</div><div class="mv">${Math.round(paid/Math.max(cnt,1)*100)}%</div><div class="ms">${paid}/${cnt}</div></div></div>`;
   if(tp.length){h+=`<div class="card"><div class="ct">Units sold</div>`;tp.forEach(([k,q])=>{h+=`<div class="br"><div class="bl">${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}</div><div class="btr"><div class="bfl" style="width:${Math.round(q/mq*100)}%;background:var(--teal)"></div></div><div class="bvl">${q}</div></div>`;});h+='</div>';}
   if(tc.length){h+=`<div class="card"><div class="ct">Top customers</div>`;tc.forEach(([n,r])=>{h+=`<div class="br"><div class="bl">${n}</div><div class="btr"><div class="bfl" style="width:${Math.round(r/mc*100)}%;background:var(--teal2)"></div></div><div class="bvl">EGP ${(Math.round(r/100)/10).toFixed(1)}k</div></div>`;});h+='</div>';}
   if(!cnt)h+='<p class="hint">No data for this period.</p>';

@@ -88,7 +88,8 @@ input:focus, select:focus { border-color: var(--border3); }
 
 .pg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 @media (max-width: 600px) { .pg { grid-template-columns: repeat(3, 1fr); } .fg { grid-template-columns: 1fr; } }
-.pi label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 3px; line-height: 1.4; }
+.pi label { font-size: 13px; font-weight: 500; color: var(--text); display: block; margin-bottom: 3px; line-height: 1.3; }
+.pi label .pi-sub { display: block; font-size: 11px; font-weight: 400; color: var(--text3); margin-top: 1px; }
 .pi input { width: 100%; text-align: center; }
 
 .sep { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.25rem 0 0.6rem; font-weight: 500; padding-bottom: 6px; border-bottom: 0.5px solid var(--border); }
@@ -482,24 +483,30 @@ function populateUI() {
   buildPG(); renderPricing(); renderSales(); renderInventory(); renderOrders();
 }
 
+// ─── PRODUCT GRID ──────────────────────────────────────────────────────────
+function pgLabel(k) {
+  // e.g. "Beef Dinner 300" → main: "Beef 300g", sub: price
+  const isDinner = k.includes('Dinner');
+  const protein = k.replace(' Dinner 300','').replace(' Dinner 500','').replace(' Dinner','');
+  const sz = k.match(/300/) ? '300g' : k.match(/500/) ? '500g' : '';
+  const main = isDinner ? `${protein} ${sz}` : k; // "Beef 300g" or "Bone" / "Daily Boost"
+  const p = px(k);
+  const sub = p === 0 ? '<span style="color:var(--red)">TBD</span>' : 'EGP ' + p;
+  return { main, sub };
+}
+
 function buildPG() {
   document.getElementById('npg').innerHTML = PKEYS.map(k => {
-    const p = px(k), tbd = p===0;
-    const lbl = k.replace(' Dinner','').replace(/ (300|500)$/,'');
-    const sz = k.match(/300/)? '300g' : k.match(/500/)? '500g' : '';
-    const sub = tbd ? '<span style="color:#A32D2D">TBD</span>' : 'EGP '+p;
-    return `<div class="pi"><label>${lbl}<br><span style="font-size:10px;color:var(--text3)">${sz?sz+' · ':''}${sub}</span></label><input type="number" id="p_${k.replace(/ /g,'_')}" min="0" value="0" onchange="calcT()" /></div>`;
+    const { main, sub } = pgLabel(k);
+    return `<div class="pi"><label>${main}<span class="pi-sub">${sub}</span></label><input type="number" id="p_${k.replace(/ /g,'_')}" min="0" value="0" onchange="calcT()" /></div>`;
   }).join('');
 }
 
 function buildEditPG(o) {
   document.getElementById('epg').innerHTML = PKEYS.map(k => {
-    const p = px(k), tbd = p===0;
-    const lbl = k.replace(' Dinner','').replace(/ (300|500)$/,'');
-    const sz = k.match(/300/)? '300g' : k.match(/500/)? '500g' : '';
-    const sub = tbd ? '<span style="color:#A32D2D">TBD</span>' : 'EGP '+p;
+    const { main, sub } = pgLabel(k);
     const val = op(o)[k] || 0;
-    return `<div class="pi"><label>${lbl}<br><span style="font-size:10px;color:var(--text3)">${sz?sz+' · ':''}${sub}</span></label><input type="number" id="ep_${k.replace(/ /g,'_')}" min="0" value="${val}" onchange="calcEditT()" /></div>`;
+    return `<div class="pi"><label>${main}<span class="pi-sub">${sub}</span></label><input type="number" id="ep_${k.replace(/ /g,'_')}" min="0" value="${val}" onchange="calcEditT()" /></div>`;
   }).join('');
 }
 
@@ -750,29 +757,69 @@ document.getElementById('editModal').addEventListener('click', function(e) {
 
 // ─── SALES ─────────────────────────────────────────────────────────────────
 function renderSales() {
-  const per=document.getElementById('speriod')?.value||'all', now=new Date();
-  let f=orders.filter(o=>!o.archived&&o.totalPrice>0);
-  if(per==='month'){const m=now.toISOString().slice(0,7);f=f.filter(o=>(o.deliveryDate||'').startsWith(m));}
-  else if(per==='last30'){const c=new Date(now-30*864e5).toISOString().slice(0,10);f=f.filter(o=>(o.deliveryDate||'')>=c);}
-  else if(per==='year'){f=f.filter(o=>(o.deliveryDate||'').startsWith(now.getFullYear()+''));}
-  // kg sold: 300g packs = 0.3kg, 500g packs = 0.5kg, bone + daily boost = 1kg each
-  const totalKg = parseFloat(f.reduce((s,o) =>
+  const per = document.getElementById('speriod')?.value || 'all';
+  const now = new Date();
+
+  // All non-archived orders for counts/paid metrics
+  let allF = orders.filter(o => !o.archived);
+  // Orders with a price for revenue metrics
+  let revF = orders.filter(o => !o.archived && o.totalPrice > 0);
+
+  if (per === 'month') {
+    const m = now.toISOString().slice(0,7);
+    allF = allF.filter(o => (o.deliveryDate||'').startsWith(m));
+    revF = revF.filter(o => (o.deliveryDate||'').startsWith(m));
+  } else if (per === 'last30') {
+    const c = new Date(now - 30*864e5).toISOString().slice(0,10);
+    allF = allF.filter(o => (o.deliveryDate||'') >= c);
+    revF = revF.filter(o => (o.deliveryDate||'') >= c);
+  } else if (per === 'year') {
+    allF = allF.filter(o => (o.deliveryDate||'').startsWith(now.getFullYear()+''));
+    revF = revF.filter(o => (o.deliveryDate||'').startsWith(now.getFullYear()+''));
+  }
+
+  const cnt = allF.length;
+  const paid = allF.filter(o => o.paid).length;
+  const rev = revF.reduce((s,o) => s + (o.totalPrice||0), 0);
+  const avg = revF.length ? Math.round(rev / revF.length) : 0;
+
+  // kg sold across all orders
+  const totalKg = parseFloat(allF.reduce((s,o) =>
     s + (o.b300||0)*0.3 + (o.b500||0)*0.5
       + (o.c300||0)*0.3 + (o.c500||0)*0.5
       + (o.r300||0)*0.3 + (o.r500||0)*0.5
       + (o.d300||0)*0.3 + (o.d500||0)*0.5
       + (o.bone||0)*1   + (o.boost||0)*1
   , 0).toFixed(1));
-  const rev=f.reduce((s,o)=>s+(o.totalPrice||0),0), cnt=f.length, paid=f.filter(o=>o.paid).length, avg=cnt?Math.round(rev/cnt):0;
-  const pt={};f.forEach(o=>PKEYS.forEach(k=>{const v=op(o)[k]||0;if(v>0)pt[k]=(pt[k]||0)+v;}));
-  const tp=Object.entries(pt).sort((a,b)=>b[1]-a[1]).slice(0,6), mq=tp[0]?.[1]||1;
-  const cr={};f.forEach(o=>{if(o.customer)cr[o.customer]=(cr[o.customer]||0)+(o.totalPrice||0);});
-  const tc=Object.entries(cr).sort((a,b)=>b[1]-a[1]).slice(0,5), mc=tc[0]?.[1]||1;
-  let h=`<div class="mg"><div class="m"><div class="ml">Revenue</div><div class="mv" style="font-size:17px">EGP ${rev.toLocaleString()}</div></div><div class="m"><div class="ml">Food sold</div><div class="mv">${totalKg}</div><div class="ms">kg</div></div><div class="m"><div class="ml">Orders</div><div class="mv">${cnt}</div></div><div class="m"><div class="ml">Avg order</div><div class="mv" style="font-size:17px">EGP ${avg.toLocaleString()}</div></div><div class="m"><div class="ml">Paid</div><div class="mv">${Math.round(paid/Math.max(cnt,1)*100)}%</div><div class="ms">${paid}/${cnt}</div></div></div>`;
-  if(tp.length){h+=`<div class="card"><div class="ct">Units sold</div>`;tp.forEach(([k,q])=>{h+=`<div class="br"><div class="bl">${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}</div><div class="btr"><div class="bfl" style="width:${Math.round(q/mq*100)}%;background:var(--teal)"></div></div><div class="bvl">${q}</div></div>`;});h+='</div>';}
-  if(tc.length){h+=`<div class="card"><div class="ct">Top customers</div>`;tc.forEach(([n,r])=>{h+=`<div class="br"><div class="bl">${n}</div><div class="btr"><div class="bfl" style="width:${Math.round(r/mc*100)}%;background:var(--teal2)"></div></div><div class="bvl">EGP ${(Math.round(r/100)/10).toFixed(1)}k</div></div>`;});h+='</div>';}
-  if(!cnt)h+='<p class="hint">No data for this period.</p>';
-  document.getElementById('scontent').innerHTML=h;
+
+  const pt = {};
+  allF.forEach(o => PKEYS.forEach(k => { const v = op(o)[k]||0; if(v>0) pt[k]=(pt[k]||0)+v; }));
+  const tp = Object.entries(pt).sort((a,b) => b[1]-a[1]).slice(0,6), mq = tp[0]?.[1]||1;
+
+  const cr = {};
+  revF.forEach(o => { if(o.customer) cr[o.customer]=(cr[o.customer]||0)+(o.totalPrice||0); });
+  const tc = Object.entries(cr).sort((a,b) => b[1]-a[1]).slice(0,5), mc = tc[0]?.[1]||1;
+
+  let h = `<div class="mg">
+    <div class="m"><div class="ml">Revenue</div><div class="mv" style="font-size:17px">EGP ${rev.toLocaleString()}</div><div class="ms">${revF.length} priced orders</div></div>
+    <div class="m"><div class="ml">Food sold</div><div class="mv">${totalKg}</div><div class="ms">kg</div></div>
+    <div class="m"><div class="ml">Orders</div><div class="mv">${cnt}</div></div>
+    <div class="m"><div class="ml">Avg order</div><div class="mv" style="font-size:17px">EGP ${avg.toLocaleString()}</div></div>
+    <div class="m"><div class="ml">Paid</div><div class="mv">${Math.round(paid/Math.max(cnt,1)*100)}%</div><div class="ms">${paid}/${cnt}</div></div>
+  </div>`;
+
+  if (tp.length) {
+    h += `<div class="card"><div class="ct">Units sold</div>`;
+    tp.forEach(([k,q]) => { h+=`<div class="br"><div class="bl">${k.replace(' Dinner','').replace(' 300',' 300g').replace(' 500',' 500g')}</div><div class="btr"><div class="bfl" style="width:${Math.round(q/mq*100)}%;background:var(--teal)"></div></div><div class="bvl">${q}</div></div>`; });
+    h += '</div>';
+  }
+  if (tc.length) {
+    h += `<div class="card"><div class="ct">Top customers</div>`;
+    tc.forEach(([n,r]) => { h+=`<div class="br"><div class="bl">${n}</div><div class="btr"><div class="bfl" style="width:${Math.round(r/mc*100)}%;background:var(--teal2)"></div></div><div class="bvl">EGP ${(Math.round(r/100)/10).toFixed(1)}k</div></div>`; });
+    h += '</div>';
+  }
+  if (!cnt) h += '<p class="hint">No data for this period.</p>';
+  document.getElementById('scontent').innerHTML = h;
 }
 
 // ─── PRICING ───────────────────────────────────────────────────────────────

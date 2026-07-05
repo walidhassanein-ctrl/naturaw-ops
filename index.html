@@ -580,7 +580,7 @@ function genInvoice() {
   const grandTotal = total + dc;
   if(dc > 0) inv += `Subtotal: EGP ${total.toLocaleString()}\nDelivery: EGP ${dc}\n━━━━━━━━━━━━━━━━━━━━━━\n`;
   inv += `*Total: EGP ${grandTotal.toLocaleString()}*\nPayment: ${o.paymentMethod||'—'}`;
-  if(o.paymentMethod === 'Instapay') inv += `\nInstapay to: 01013521051`;
+  if(o.paymentMethod === 'Instapay') inv += `\nInstapay to: 01224910154`;
   if(!o.paid) inv += `\n\n_Payment pending_`;
   inv += `\n\nThank you for choosing NatuRaw! 🐾`;
   document.getElementById('itext').textContent = inv;

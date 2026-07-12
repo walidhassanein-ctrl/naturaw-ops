@@ -136,6 +136,7 @@ input:focus, select:focus { border-color: var(--border3); }
     <button onclick="showTab('neworder',this)">New order</button>
     <button onclick="showTab('orders',this)">Orders</button>
     <button onclick="showTab('sales',this)">Sales</button>
+    <button onclick="showTab('pl',this)">P&amp;L</button>
     <button onclick="showTab('pricing',this)">Pricing</button>
   </div>
 
@@ -226,6 +227,31 @@ input:focus, select:focus { border-color: var(--border3); }
     <div id="scontent"><p class="hint">Loading...</p></div>
   </div>
 
+  <!-- P&L -->
+  <div id="tab-pl" class="tab">
+    <div id="plcontent"><p class="hint">Loading...</p></div>
+    <div class="card">
+      <div class="ct">Add expense (loss)</div>
+      <div class="fg">
+        <div class="full"><label>Description</label><input type="text" id="plDesc" placeholder="e.g. Beef purchase, delivery fuel..." /></div>
+        <div><label>Date</label><input type="date" id="plDate" /></div>
+        <div><label>Amount (EGP)</label><input type="number" id="plAmount" min="0" /></div>
+        <div><label>Category</label>
+          <select id="plCategory">
+            <option value="">—</option>
+            <option>Raw materials</option><option>Packaging</option><option>Delivery / courier</option>
+            <option>Equipment</option><option>Marketing</option><option>Rent / utilities</option><option>Other</option>
+          </select>
+        </div>
+        <div class="full"><label>Notes</label><input type="text" id="plNotes" placeholder="Optional..." /></div>
+      </div>
+      <div style="margin-top:1rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btnp" onclick="submitExpense()">Add expense</button>
+        <span id="plMsg" class="sm"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- PRICING -->
   <div id="tab-pricing" class="tab">
     <div class="card">
@@ -285,6 +311,7 @@ const DB_PRODUCTS  = '33332c20-c289-49dc-83ae-8406b07b1e6b';
 const DB_STOCK     = '5ca011a9-c00c-4b9c-9fe5-a86b44a70497';
 const DB_DOGS      = '308bd212-68bb-80e2-8609-ee0e3e10827e';
 const DB_MATERIALS = 'c0c76d91-d151-4ad0-8234-4b3bd65e6a5d';
+const DB_EXPENSES = '97460179-648d-4fc2-8feb-65d7ca517084';
 
 const PROXY = 'https://lucky-silence-1f1e.walid-hassanein.workers.dev';
 
@@ -300,7 +327,7 @@ const PNAME = {
 };
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
-let orders = [], customers = [], products = [], stock = [], materials = [], dogs = [];
+let orders = [], customers = [], products = [], stock = [], materials = [], dogs = [], expenses = [];
 let editingOrderId = null;
 
 // ─── API ───────────────────────────────────────────────────────────────────
@@ -354,13 +381,14 @@ const pRel = (p, n) => (p.properties[n]?.relation || []).map(r => r.id);
 async function loadAll() {
   setSL('Syncing...', true);
   try {
-    const [rawO, rawC, rawP, rawS, rawM, rawD] = await Promise.all([
+    const [rawO, rawC, rawP, rawS, rawM, rawD, rawE] = await Promise.all([
       queryDB(DB_ORDERS),
       queryDB(DB_CUSTOMERS),
       queryDB(DB_PRODUCTS),
       queryDB(DB_STOCK),
       queryDB(DB_MATERIALS),
-      queryDB(DB_DOGS)
+      queryDB(DB_DOGS),
+      queryDB(DB_EXPENSES)
     ]);
 
     products = rawP.map(p => ({
@@ -378,7 +406,8 @@ async function loadAll() {
       phone: pTxt(c,'Phone'),
       address: pTxt(c,'Address'),
       area: pTxt(c,'Area / Zone'),
-      location: pTxt(c,'Location')
+      location: pTxt(c,'Location'),
+      status: pTxt(c,'Status')
     }));
 
     const cMap = {};
@@ -451,6 +480,15 @@ async function loadAll() {
       o.dogNames = (o.dogIds || []).map(id => dogMap[id]?.name).filter(Boolean);
     });
 
+    expenses = rawE.map(e => ({
+      id: e.id,
+      description: pTxt(e,'Description') || '',
+      date: pDate(e,'Date'),
+      amount: pNum(e,'Amount (EGP)'),
+      category: pTxt(e,'Category') || '',
+      notes: pTxt(e,'Notes') || ''
+    }));
+
     setSL(`Synced ${orders.length} orders · ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`);
     populateUI();
   } catch(e) {
@@ -466,7 +504,7 @@ function op(o) { return {'Beef Dinner 300':o.b300||0,'Beef Dinner 500':o.b500||0
 function populateUI() {
   const cs = document.getElementById('ncust');
   cs.innerHTML = '<option value="">Select customer...</option>';
-  [...customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c => {
+  [...customers].filter(c => c.status === 'Active').sort((a,b)=>a.name.localeCompare(b.name)).forEach(c => {
     cs.innerHTML += `<option value="${c.id}">${c.name}</option>`;
   });
   const is = document.getElementById('isel');
@@ -474,7 +512,7 @@ function populateUI() {
   [...orders].filter(o=>!o.archived).sort((a,b)=>(b.deliveryDate||'').localeCompare(a.deliveryDate||'')).forEach(o => {
     is.innerHTML += `<option value="${o.id}">${o.orderId||o.id.slice(0,8)} — ${o.customer||'?'} (${o.deliveryDate||'—'})</option>`;
   });
-  buildPG(); renderPricing(); renderSales(); renderOrders();
+  buildPG(); renderPricing(); renderSales(); renderOrders(); renderPL();
 }
 
 // ─── PRODUCT GRID ──────────────────────────────────────────────────────────
@@ -816,6 +854,81 @@ function renderSales() {
   document.getElementById('scontent').innerHTML = h;
 }
 
+// ─── P&L ───────────────────────────────────────────────────────────────────
+function renderPL() {
+  const el = document.getElementById('plcontent');
+  const paidOrders = orders.filter(o => !o.archived && o.paid && o.totalPrice > 0);
+  const totalProfit = paidOrders.reduce((s,o) => s + (o.totalPrice||0), 0);
+  const totalLosses = expenses.reduce((s,e) => s + (e.amount||0), 0);
+  const balance = totalProfit - totalLosses;
+
+  let h = `<div class="mg">
+    <div class="m"><div class="ml">Current balance</div><div class="mv" style="font-size:20px;color:${balance>=0?'var(--green)':'var(--red)'}">EGP ${balance.toLocaleString()}</div></div>
+    <div class="m"><div class="ml">Total profit</div><div class="mv" style="font-size:17px;color:var(--green)">EGP ${totalProfit.toLocaleString()}</div><div class="ms">${paidOrders.length} paid orders</div></div>
+    <div class="m"><div class="ml">Total losses</div><div class="mv" style="font-size:17px;color:var(--red)">EGP ${totalLosses.toLocaleString()}</div><div class="ms">${expenses.length} entries</div></div>
+  </div>`;
+
+  const txns = [
+    ...paidOrders.map(o => ({ date:o.deliveryDate||o.orderDate||'', label:o.customer||'Order', sub:o.orderId||'', amount:o.totalPrice||0, type:'profit' })),
+    ...expenses.map(e => ({ date:e.date||'', label:e.description||'Expense', sub:e.category||'', amount:-(e.amount||0), type:'loss', id:e.id }))
+  ].filter(t => t.date).sort((a,b) => b.date.localeCompare(a.date));
+
+  if (txns.length) {
+    h += `<div class="card"><div class="ct">Transactions</div><div style="overflow-x:auto"><table>
+      <thead><tr><th>Date</th><th>Description</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead><tbody>`;
+    txns.forEach(t => {
+      const amtColor = t.type === 'profit' ? 'var(--green)' : 'var(--red)';
+      const sign = t.type === 'profit' ? '+' : '−';
+      const badge = t.type === 'profit'
+        ? '<span class="badge bdone">Profit</span>'
+        : '<span class="badge" style="background:var(--red-bg);color:var(--red)">Loss</span>';
+      h += `<tr>
+        <td style="white-space:nowrap;font-size:12px">${fd(t.date)}</td>
+        <td><strong style="font-size:13px">${t.label}</strong>${t.sub ? `<br><span style="font-size:11px;color:var(--text3)">${t.sub}</span>` : ''}</td>
+        <td>${badge}</td>
+        <td style="text-align:right;white-space:nowrap;font-weight:500;color:${amtColor}">${sign} EGP ${Math.abs(t.amount).toLocaleString()}</td>
+      </tr>`;
+    });
+    h += '</tbody></table></div></div>';
+  } else {
+    h += '<p class="hint">No transactions yet. Mark an order Paid, or add an expense below.</p>';
+  }
+
+  el.innerHTML = h;
+}
+
+async function submitExpense() {
+  const desc = document.getElementById('plDesc').value.trim();
+  const date = document.getElementById('plDate').value;
+  const amount = parseFloat(document.getElementById('plAmount').value) || 0;
+  const cat = document.getElementById('plCategory').value;
+  const notes = document.getElementById('plNotes').value || '';
+  const msg = document.getElementById('plMsg');
+  if (!desc || !date || amount <= 0) {
+    msg.className = 'sm er'; msg.textContent = 'Description, date, and a positive amount are required.';
+    return;
+  }
+  msg.className = 'sm ld'; msg.textContent = 'Saving...';
+  try {
+    await nPost('/pages', { parent: { database_id: DB_EXPENSES }, properties: {
+      'Description': { title: [{ text: { content: desc } }] },
+      'Date': { date: { start: date } },
+      'Amount (EGP)': { number: amount },
+      'Notes': { rich_text: [{ text: { content: notes } }] },
+      ...(cat ? { 'Category': { select: { name: cat } } } : {})
+    }});
+    msg.className = 'sm ok'; msg.textContent = 'Added!';
+    document.getElementById('plDesc').value = '';
+    document.getElementById('plAmount').value = '';
+    document.getElementById('plNotes').value = '';
+    document.getElementById('plCategory').value = '';
+    await loadAll();
+  } catch(e) {
+    msg.className = 'sm er'; msg.textContent = 'Failed: ' + e.message;
+    console.error(e);
+  }
+}
+
 // ─── PRICING ───────────────────────────────────────────────────────────────
 function renderPricing() {
   const el=document.getElementById('prcontent');
@@ -842,6 +955,7 @@ const today=new Date().toISOString().slice(0,10);
 document.getElementById('ddate').value=today;
 document.getElementById('ndd').value=today;
 document.getElementById('nod').value=today;
+document.getElementById('plDate').value=today;
 loadAll();
 </script>
 </body>
